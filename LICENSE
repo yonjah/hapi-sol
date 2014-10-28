@@ -1,5 +1,5 @@
 Copyright (c) 2014, Yoni Jah
-Copyright (c) 2013-2014, substack - https://github.com/substack
+Copyright (c) 2013-2014, Nathan LaFreniere <quitlahok@gmail.com>
 Copyright (c) 2012-2014, Walmart and other contributors.
 All rights reserved.
 
@@ -28,5 +28,4 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
                                   *   *   *
 
 The complete list of contributors can be found at:
-- https://github.com/hapijs/hapi-auth-cookie/graphs/contributors
-- https://github.com/yonjah/node-hat/graphs/contributors
+- https://github.com/yonjah/hapi-auth-cookie/graphs/contributors
