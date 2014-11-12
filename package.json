@@ -19,6 +19,7 @@
     "url": "https://github.com/yonjah/hapi-session/issues"
   },
   "dependencies": {
+    "bluebird": "^2.3.10",
     "boom": "^2.6.0",
     "hoek": "^2.8.0"
   },
