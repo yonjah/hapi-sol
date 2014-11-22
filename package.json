@@ -1,11 +1,11 @@
 {
-  "name": "hapi-session",
-  "version": "0.2.0",
+  "name": "hapi-sol",
+  "version": "0.2.1",
   "description": "A simpler session based auth plugin for Hapi",
   "main": "index.js",
   "repository": {
     "type": "git",
-    "url": "git://github.com/yonjah/hapi-session.git"
+    "url": "git://github.com/yonjah/hapi-sol.git"
   },
   "keywords": [
     "hapi",
@@ -16,7 +16,7 @@
   "author": "Yoni Jah <yoni.jah@non.co.il>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/yonjah/hapi-session/issues"
+    "url": "https://github.com/yonjah/hapi-sol/issues"
   },
   "dependencies": {
     "bluebird": "^2.3.10",
