@@ -1,8 +1,9 @@
-# Hapi-Session
+# Hapi-Sol
 
-This is a session based auth scheme for Hapi.
-A lot of stuff from the original scheme (mostly using async and callback scheme) so if your upgrading please refer to the examples or read on.
-As with the original scheme a lot of the code was gratuitously stolen from the hapi [auth cookie scheme](https://github.com/hapijs/hapi-auth-cookie), and this module works in much the same way.
+A Session based auth scheme for Hapi
+
+<sub><sup>This scheme is based on [hapi-session](https://github.com/nlf/hapi-session) but the API is a bit diffrent (mostly using async and callback scheme) and most of the underline code has changed.
+As with the original scheme a lot of the code was gratuitously stolen from the hapi [auth cookie scheme](https://github.com/hapijs/hapi-auth-cookie), and this module works in much the same way.</sup></sub>
 
 This Module will save a cookie with a unique session ID, the ID has high entropy and is randomly secure so it should be impossible to fake. all other data is never sent to the user so you can save in the session whatever information you wont without the fear of it being faked or compromised.
 
