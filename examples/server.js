@@ -1,6 +1,6 @@
 "use strict";
 var hapi    = require('hapi'),
-	session = require('../'),
+	sol     = require('../'),
 	server  = new hapi.Server(3000);
 
 var users = {
@@ -50,7 +50,7 @@ var logout = function (request, reply) {
 	});
 };
 
-server.pack.register(session, function (err) {
+server.pack.register(sol, function (err) {
 
 	server.auth.strategy('session', 'session', true, {
 		password: undefined,
@@ -74,7 +74,7 @@ server.pack.register(session, function (err) {
 				mode: 'try'
 			},
 			plugins: {
-				'session': {
+				'sol': {
 					redirectTo: false
 				}
 			}
@@ -88,6 +88,6 @@ server.pack.register(session, function (err) {
 	}]);
 
 	server.start(function () {
-        console.log('Server ready');
-    });
+		console.log('Server ready');
+	});
 });

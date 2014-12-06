@@ -18,6 +18,19 @@
   "bugs": {
     "url": "https://github.com/yonjah/hapi-sol/issues"
   },
+  "devDependencies": {
+    "hapi": "^7.5.2",
+    "istanbul": "^0.3.2",
+    "mocha": "^2.0.1",
+    "mocha-istanbul": "^0.2.0",
+    "should": "^4.2.0"
+  },
+  "scripts": {
+    "test": "ENVIRONMENT=test ./node_modules/mocha/bin/mocha test",
+    "cov": "npm run lib-cov &&  ENVIRONMENT=test ISTANBUL_REPORTERS=html,text-summary  COVER=SOL ./node_modules/mocha/bin/mocha --timeout=20000 --reporter mocha-istanbul",
+    "clean": "rm -rf lib-cov cobertura-coverage.xml coverage; true",
+    "lib-cov": "npm run clean && ./node_modules/istanbul/lib/cli.js instrument --output lib-cov --no-compact --variable global.__coverage__ lib"
+  },
   "dependencies": {
     "bluebird": "^2.3.10",
     "boom": "^2.6.0",
