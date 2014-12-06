@@ -54,5 +54,11 @@ describe('Sol Server Auth', function(){
 		});
 	});
 
+	it('should fail', function (){
+		return server.inject({url : '/'}).then(function () {
+			call.should.be.ok;
+		});
+	});
+
 
 });
