@@ -51,8 +51,8 @@ describe('Sol', function(){
 					}
 				}
 			}, fakeServer = {
-				cache: function (cacheId, options) {
-					cacheId.should.be.eql(settings.cacheId);
+				cache: function (options) {
+					options.segment.should.be.eql(settings.cacheId);
 					options.expiresIn.should.be.eql(settings.ttl);
 					return  {
 						set : function (){},

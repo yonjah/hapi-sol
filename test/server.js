@@ -27,7 +27,7 @@ describe('Sol Server Auth', function(){
 	replaceInject(server);
 
 	before(function (done) {
-		server.pack.register(sol, function (err) {
+		server.register(sol, function (err) {
 			server.auth.strategy('session', 'session', true, options);
 			server.route([{
 				method: 'GET',
@@ -54,12 +54,4 @@ describe('Sol Server Auth', function(){
 			call.should.not.be.ok;
 		});
 	});
-
-	it.skip('should fail', function (){
-		return server.inject({url : '/'}).then(function () {
-			call.should.be.ok;
-		});
-	});
-
-
 });
