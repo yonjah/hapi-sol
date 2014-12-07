@@ -21,8 +21,9 @@ function replaceInject (server) {
 describe('Sol Server Auth', function(){
 	var call    = false,
 		options = {},
-		server  = new hapi.Server(++port);
+		server  = new hapi.Server();
 
+	server.connection({ port: ++port });
 	replaceInject(server);
 
 	before(function (done) {
