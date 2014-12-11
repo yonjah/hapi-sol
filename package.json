@@ -1,6 +1,6 @@
 {
   "name": "hapi-sol",
-  "version": "0.2.2-7",
+  "version": "0.2.3-8",
   "description": "A simpler session based auth plugin for Hapi",
   "main": "index.js",
   "repository": {
@@ -19,7 +19,7 @@
     "url": "https://github.com/yonjah/hapi-sol/issues"
   },
   "devDependencies": {
-    "hapi": "^7.5.2",
+    "hapi": "^8.0.0",
     "istanbul": "^0.3.2",
     "mocha": "^2.0.1",
     "mocha-istanbul": "^0.2.0",
@@ -38,6 +38,6 @@
     "hoek": "^2.8.0"
   },
   "peerDependencies": {
-    "hapi": ">=7.x.x"
+    "hapi": ">=8.x.x"
   }
 }

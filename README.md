@@ -8,12 +8,13 @@ As with the original scheme a lot of the code was gratuitously stolen from the h
 This Module will save a cookie with a unique session ID, the ID has high entropy and is randomly secure so it should be impossible to fake. all other data is never sent to the user so you can save in the session whatever information you wont without the fear of it being faked or compromised.
 
 ## Usage
+**For Hapi 7.0.0 see [previous version](https://github.com/yonjah/hapi-sol/tree/v0.2.2-7)**
 For demo server example usage see the [server.js](https://github.com/yonjah/hapi-session/blob/master/examples/server.js)
 
 
 ### Loading the module
 ```javascript
-server.pack.register(require('hapi-sol'), function cb (err) {
+server.register(require('hapi-sol'), function cb (err) {
 	server.auth.strategy('session', 'session', true, {
 		// Options Object
 	});
