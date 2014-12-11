@@ -13,7 +13,7 @@ For demo server example usage see the [server.js](https://github.com/yonjah/hapi
 
 ### Loading the module
 ```javascript
-server.pack.register(require('hapi-session'), function cb (err) {
+server.register(require('hapi-sol'), function cb (err) {
 	server.auth.strategy('session', 'session', true, {
 		// Options Object
 	});

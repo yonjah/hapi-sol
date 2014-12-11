@@ -1,7 +1,11 @@
 "use strict";
 var hapi    = require('hapi'),
 	sol     = require('../'),
-	server  = new hapi.Server(3000);
+	server  = new hapi.Server({debug: {request: ['error']}});
+
+server.connection({
+	port: 8000
+});
 
 var users = {
 	john: {
@@ -50,44 +54,43 @@ var logout = function (request, reply) {
 	});
 };
 
-server.pack.register(sol, function (err) {
-
+server.register(sol, function (err) {
 	server.auth.strategy('session', 'session', true, {
 		password: undefined,
 		cookie: 'sid-example',
 		redirectTo: '/login',
 		isSecure: false
 	});
+});
 
-	server.route([{
-		method: 'GET',
-		path: '/',
-		config: {
-			handler: home
-		}
-	}, {
-		method: ['GET', 'POST'],
-		path: '/login',
-		config: {
-			handler: login,
-			auth: {
-				mode: 'try'
-			},
-			plugins: {
-				'sol': {
-					redirectTo: false
-				}
+server.route([{
+	method: 'GET',
+	path: '/',
+	config: {
+		handler: home
+	}
+}, {
+	method: ['GET', 'POST'],
+	path: '/login',
+	config: {
+		handler: login,
+		auth: {
+			mode: 'try'
+		},
+		plugins: {
+			'sol': {
+				redirectTo: false
 			}
 		}
-	}, {
-		method: 'GET',
-		path: '/logout',
-		config: {
-			handler: logout
-		}
-	}]);
+	}
+}, {
+	method: 'GET',
+	path: '/logout',
+	config: {
+		handler: logout
+	}
+}]);
 
-	server.start(function () {
-		console.log('Server ready');
-	});
+server.start(function () {
+	console.log('Server ready !!!');
 });
