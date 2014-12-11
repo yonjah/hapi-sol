@@ -9,6 +9,7 @@ This Module will save a cookie with a unique session ID, the ID has high entropy
 
 ## Usage
 **For Hapi 7.0.0 see [previous version](https://github.com/yonjah/hapi-sol/tree/v0.2.2-7)**
+
 For demo server example usage see the [server.js](https://github.com/yonjah/hapi-session/blob/master/examples/server.js)
 
 
