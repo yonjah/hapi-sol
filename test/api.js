@@ -70,7 +70,7 @@ describe('Sol', function(){
 					options.path.should.be.eql(settings.path);
 				},
 				ext: function(eventKey, func) {
-					func.should.be.a.Function
+					func.should.be.a.Function;
 					events[eventKey] = func;
 				}
 			}, settings= {

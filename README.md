@@ -55,7 +55,7 @@ when setting an auth strategy you can set the following options:
 - `password` Password to be use to encrypt the cookie data sent to the user, since we are not sending any sensitive data this can be be left undefined __default(undefined)__
 - `cacheId` the cache ID to use when saving sessions __default('\_hapi\_session')__
 - `cache` caching manager if you don't want to use something else (needs to implement _get_,_set_ and _drop_ methods) __default(undefined)__
-- `validateFunc` A function to farther validate the cookie if needed __default(undefined)__
+- `validateFunc` A function to farther validate the cookie if needed function signature should be (request, credentials) __default(undefined)__
 - `clearInvalid` If cookie is tested to be invalid by the validateFunc should we clear the existing cookie __default(true)__
 - `assumePromise` if set to true assumes `validateFunc` and `cache` methods will return a promise __default(false)__
 - `sidLength` The length in Bytes for the generated random ID Should be high enough so collision would be impossible __default(36)__

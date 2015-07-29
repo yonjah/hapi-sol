@@ -16,7 +16,7 @@ function replaceInject (server) {
 			inject.call(server, options, resolve);
 		});
 	};
-};
+}
 
 describe('Sol Server Auth', function(){
 	var call    = false,
