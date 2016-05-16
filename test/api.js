@@ -1,26 +1,27 @@
-/* globals describe, before, after, it, beforeEach*/
+/* globals describe, it*/
 "use strict";
-require('should');
-var sol     = require('../'),
+
+var should  = require('should'),
+	sol     = require('../'),
 	name    = 'sol',
 	id      = 'session';
 
-describe('Sol', function(){
-	it('should expose a register function', function (){
+describe('Sol Plugin API', function () {
+	it('should expose a register function', function () {
 		sol.register.should.be.a.Function;
 	});
-	it('should have the name attribute `sol`', function (){
+	it('should have the name attribute `sol`', function () {
 		sol.register.attributes.should.be.ok;
 		sol.register.attributes.name.should.be.eql(name);
 	});
 
-	describe('Register function', function(){
+	describe('Register function', function () {
 		var schemeCall = false,
 			schemeId   = null,
 			schemeFunc = null,
 			fakePlugin = {
 				auth: {
-					scheme: function (id, func){
+					scheme: function (id, func) {
 						schemeCall = true;
 						schemeId   = id;
 						schemeFunc = func;
@@ -29,9 +30,9 @@ describe('Sol', function(){
 			};
 
 
-		it('should register the Scheme', function (){
+		it('should register the Scheme', function () {
 			var nextCall = false;
-			sol.register(fakePlugin, {}, function(){
+			sol.register(fakePlugin, {}, function () {
 				nextCall = true;
 			});
 
@@ -41,12 +42,13 @@ describe('Sol', function(){
 			schemeFunc.should.be.a.Function;
 		});
 	});
-	describe('Implement function', function(){
+
+	describe('Implement function', function () {
 		var implement,
 			events = {},
 			fakePlugin = {
 				auth: {
-					scheme: function (id, func){
+					scheme: function (id, func) {
 						implement = func;
 					}
 				}
@@ -54,26 +56,26 @@ describe('Sol', function(){
 				cache: function (options) {
 					options.segment.should.be.eql(settings.cacheId);
 					options.expiresIn.should.be.eql(settings.ttl);
-					return  {
-						set : function (){},
-						drop: function (){},
-						get : function (){}
+					return {
+						set : function () {},
+						drop: function () {},
+						get : function () {}
 					};
 				},
-				state: function(cookieId, options){
+				state: function (cookieId, options) {
 					cookieId.should.be.eql(settings.cookie);
 					options.encoding.should.be.eql(settings.password ? 'iron' : 'none');
 					options.ttl.should.be.eql(settings.ttl);
-					(options.password === settings.password ).should.be.ok;
+					(options.password === settings.password).should.be.ok;
 					options.isSecure.should.be.eql(settings.isSecure);
 					options.isHttpOnly.should.be.eql(settings.isHttpOnly);
 					options.path.should.be.eql(settings.path);
 				},
-				ext: function(eventKey, func) {
+				ext: function (eventKey, func) {
 					func.should.be.a.Function;
 					events[eventKey] = func;
 				}
-			}, settings= {
+			}, settings = {
 				cacheId      : '_hapi_session',
 				sidLength    : 36,
 				uidRetries   : 5,
@@ -91,15 +93,9 @@ describe('Sol', function(){
 				path         : '/'
 			};
 
-		sol.register(fakePlugin, {}, function(){});
+		sol.register(fakePlugin, {}, function () {});
 
-		it('should return a scheme', function (){
-			var scheme = implement(fakeServer, settings);
-			scheme.should.be.an.Object;
-			scheme.authenticate.should.be.a.Function;
-		});
-
-		it('should return a scheme', function (){
+		it('should return a scheme', function () {
 			var scheme = implement(fakeServer, settings);
 			scheme.should.be.an.Object;
 			scheme.authenticate.should.be.a.Function;

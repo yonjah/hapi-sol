@@ -1,12 +1,10 @@
-/* globals describe, before, after, it, beforeEach*/
+/* globals describe, before, it*/
 "use strict";
-require('should');
-var sol     = require('../'),
+var should  = require('should'),
+	sol     = require('../'),
 	hapi    = require('hapi'),
 	Promise = require("bluebird"),
-	port    = 3000,
-	name    = 'sol',
-	id      = 'session';
+	port    = 3000;
 
 
 function replaceInject (server) {
@@ -18,7 +16,7 @@ function replaceInject (server) {
 	};
 }
 
-describe('Sol Server Auth', function(){
+describe('Sol Server Auth', function () {
 	var call    = false,
 		options = {},
 		server  = new hapi.Server();
@@ -27,14 +25,14 @@ describe('Sol Server Auth', function(){
 	replaceInject(server);
 
 	before(function (done) {
-		server.register(sol, function (err) {
+		server.register(sol, function (/*err*/) {
 			server.auth.strategy('session', 'session', true, options);
 			server.route([{
 				method: 'GET',
 				path: '/',
 				config: {
 					handler: function (request, reply) {
-						call=true;
+						call = true;
 						reply();
 					}
 				}
@@ -43,13 +41,13 @@ describe('Sol Server Auth', function(){
 		});
 	});
 
-	it('should not give access to route without auth', function (){
+	it('should not give access to route without auth', function () {
 		return server.inject({url : '/'}).then(function () {
 			call.should.not.be.ok;
 		});
 	});
 
-	it('should not give access to route with fake auth', function (){
+	it('should not give access to route with fake auth', function () {
 		return server.inject({url : '/'}).then(function () {
 			call.should.not.be.ok;
 		});
