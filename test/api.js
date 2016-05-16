@@ -10,6 +10,7 @@ describe('Sol Plugin API', function () {
 	it('should expose a register function', function () {
 		sol.register.should.be.a.Function;
 	});
+
 	it('should have the name attribute `sol`', function () {
 		sol.register.attributes.should.be.ok;
 		sol.register.attributes.name.should.be.eql(name);
