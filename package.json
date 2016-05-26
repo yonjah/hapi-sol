@@ -1,6 +1,6 @@
 {
   "name": "hapi-sol",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "A simpler session based auth plugin for Hapi",
   "main": "index.js",
   "repository": {
@@ -19,7 +19,7 @@
     "url": "https://github.com/yonjah/hapi-sol/issues"
   },
   "devDependencies": {
-    "hapi": "^8.8.1",
+    "hapi": "8.x.x",
     "istanbul": "^0.3.2",
     "mocha": "^2.0.1",
     "mocha-istanbul": "^0.2.0",
@@ -34,9 +34,10 @@
     "lib-cov": "npm run clean && ./node_modules/istanbul/lib/cli.js instrument --output lib-cov --no-compact --variable global.__coverage__ lib"
   },
   "dependencies": {
-    "bluebird": "^2.3.10",
-    "boom": "^2.6.0",
-    "hoek": "^2.8.0"
+    "bluebird": "3.x.x",
+    "boom": "2.x.x",
+    "hoek": "2.x.x",
+    "joi": "^6.x.x"
   },
   "peerDependencies": {
     "hapi": ">=8.x.x"

@@ -48,6 +48,7 @@ As with the set this method is asynchronous.
 ## Available options
 when setting an auth strategy you can set the following options:
 - `cookie` The cookie name __default('sid')__
+- `sessionCookie` use browser session cookies (will only apply `ttl` settings for built in cache) 
 - `path` The cookie path __default('/'')__
 - `ttl` Cookie and cache TTL in milliseconds __default(1000 * 60 * 60 * 24 //one day)__
 - `isHttpOnly` Set HTTP only cookie flag __default(true)__
