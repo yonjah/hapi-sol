@@ -37,13 +37,45 @@ once the user is logged in you will have the credentials passed to the set metho
 console.log(request.auth.credentials); //{'logined': true, 'userid': 1}
 ```
 
-To logout the user call the clear method
+To logout the user you can either call set with null value or call the clear method
 ```javascript
+return request.auth.session.set(null, function () {
+    return reply.redirect('/');
+});
+//
 return request.auth.session.clear(function () {
 	return reply.redirect('/');
 });
 ```
-As with the set this method is asynchronous.
+the `clear` method will completely remove the session from cache and create a new one while the `set` method will leave the current session active but unauthenticated. As with the `set` method `clear` is asynchronous.
+
+## Extra methods on request.auth.session
+`request.auth.session.getId` returns the current session ID
+
+`request.auth.session.getSeesion(cb)` returns the current session object
+
+`request.auth.session.setSeesion(session, cb)` save `session` as the current session object
+
+since clients will always have an active persistent session it can be useful to attach some extra data to the session object
+
+```javascript
+//on failed login attempt
+return request.auth.session.getSession()
+    .then((session) => {
+        session.attempts = session.attempts ? session.attempts + 1: 1;
+        if (session.attempts > 5) {
+            //block user ip
+        } else {
+            return request.auth.session.setSession(session);
+        }
+    });
+```
+
+Notice that the `session` Object has two internally used properties
+`authenticated` Boolean is the true if the session has credentials associated with it.
+`credentials` Object credentials saved with the session
+it better to avoid doing manual changes to this values (use the `set` method instead) since `setSession` will not do any validations on your session Object.
+
 
 ## Available options
 when setting an auth strategy you can set the following options:
