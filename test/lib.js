@@ -85,7 +85,7 @@ describe('Sol lib', function () {
 
 		describe('session.get', function () {
 			var session,
-				sid = {fake: 'sid'};
+				sid = Math.random().toString(32).substr(2, 10);
 			before(function (done) {
 				var request = { state: {sid: sid}, auth: {}};
 				func(request, {continue: function () {
@@ -96,11 +96,12 @@ describe('Sol lib', function () {
 
 			});
 
-			it('should resolve with Promise/callbacks', function (done) {
+			it('should be called with sid and resolve with Promise/callbacks', function (done) {
 				var res = {fake: 'cache'};
 				cache.get.yields(null, res, {item: res});
 				return session.get()
 					.then(function (item) {
+						cache.get.should.be.calledWith(sid);
 						item.should.be.eql(res);
 						session.get(function (err, item) {
 							try {
@@ -121,7 +122,7 @@ describe('Sol lib', function () {
 
 				return session.get()
 					.then(function () {
-						throw 'Promise Should not be resolved';
+						throw new Error('Promise Should not be resolved');
 					}, function (err) {
 						err.cause.should.be.eql(res);
 						session.get(function (err, item) {
