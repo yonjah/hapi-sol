@@ -1,11 +1,10 @@
-/* globals describe, before, it, beforeEach*/
 "use strict";
 var should      = require('should'),
+	sinon       = require('sinon'),
 	sol         = require('../'),
 	hapi        = require('hapi'),
 	hoek        = require('hoek'),
 	Promise     = require("bluebird"),
-	port        = 3000,
 	cookieRegex = /(?:[^\x00-\x20\(\)<>@\,;\:\\"\/\[\]\?\=\{\}\x7F]+)\s*=\s*(?:([^\x00-\x20\"\,\;\\\x7F]*))/;
 
 
@@ -26,7 +25,7 @@ function setServer (options) {
 	server.start = Promise.promisify(server.start, {context: server});
 	server.stop = Promise.promisify(server.stop, {context: server});
 	return new Promise((resolve, reject) => {
-		server.register(sol, (err) => {
+		server.register(sol, err => {
 			if (err) {
 				reject(err);
 
@@ -50,191 +49,172 @@ function setServer (options) {
 
 describe('scheme', () => {
 
-	it('passes with no plugin options', () => {
-		return setServer();
-	});
+	it('passes with no plugin options', () => setServer());
 
-	it('fails if cacheId is not a string', () => {
-		return setServer({ validateFunc: 387498 })
+	it('fails if cacheId is not a string', () =>
+		setServer({ validateFunc: 387498 })
 			.then(() => {
 				throw new Error('should not fullfill');
 
-			}, () => {});
+			}, () => {})
+	);
 
-	});
+	it('fails if sidLength is not a positive integer', () =>
+		setServer({ sidLength: 'not a number' })
+			.then(() => {
+					throw new Error('should not fullfill');
 
-	it('fails if sidLength is not a positive integer', () => {
-		return setServer({ sidLength: 'not a number' })
+				},
+				() => setServer({ sidLength: 1.5 })
+			).then(() => {
+					throw new Error('should not fullfill');
+
+				},
+				() => setServer({ sidLength: -1 })
+			).then(() => {
+				throw new Error('should not fullfill');
+
+			}, () => {})
+
+	);
+
+	it('fails if uidRetries is not a positive integer', () =>
+		setServer({ uidRetries: 'not a number' })
+			.then(() => {
+					throw new Error('should not fullfill');
+
+				}, () => setServer({ uidRetries: 1.5 })
+			).then(() => {
+					throw new Error('should not fullfill');
+
+				}, () => setServer({ uidRetries: -1 })
+			).then(() => {
+				throw new Error('should not fullfill');
+
+			}, () => {})
+
+	);
+
+	it('fails if clearInvalid is not a boolean', () =>
+		setServer({ clearInvalid: 'not a boolean' })
 			.then(() => {
 				throw new Error('should not fullfill');
 
-			}, () => {
-				return setServer({ sidLength: 1.5 });
+			}, () => {})
 
-			}).then(() => {
+	);
+
+	it('fails if ttl is not a positive integer', () =>
+		setServer({ ttl: 'not a number' })
+			.then(() => {
+					throw new Error('should not fullfill');
+
+				}, () => setServer({ ttl: 1.5 })
+			).then(() => {
+					throw new Error('should not fullfill');
+
+				}, () => setServer({ ttl: -1 })
+			).then(() => {
 				throw new Error('should not fullfill');
 
-			}, () => {
-				return setServer({ sidLength: -1 });
+			}, () => {})
 
-			}).then(() => {
-				throw new Error('should not fullfill');
+	);
 
-			}, () => {});
-
-	});
-
-	it('fails if uidRetries is not a positive integer', () => {
-		return setServer({ uidRetries: 'not a number' })
+	it('fails if cookie is not a string', () =>
+		setServer({ cookie: 1234 })
 			.then(() => {
 				throw new Error('should not fullfill');
 
-			}, () => {
-				return setServer({ uidRetries: 1.5 });
+			}, () => {})
 
-			}).then(() => {
-				throw new Error('should not fullfill');
+	);
 
-			}, () => {
-				return setServer({ uidRetries: -1 });
+	it('fails if cache is not an object with set,get and drop methods', () =>
+		setServer({ cache: 'not an object' })
+			.then(() => {
+					throw new Error('should not fullfill');
 
-			}).then(() => {
-				throw new Error('should not fullfill');
+				},
+				() => setServer({ cache: { } })
+			).then(() => {
+					throw new Error('should not fullfill');
 
-			}, () => {});
+				}, () => setServer({ cache: {set: () => {}, get: () => {}} })
+			).then(() => {
+					throw new Error('should not fullfill');
 
-	});
+				}, () => setServer({ cache: {set: () => {}, drop: () => {}} })
+			).then(() => {
+					throw new Error('should not fullfill');
 
-	it('fails if clearInvalid is not a boolean', () => {
-		return setServer({ clearInvalid: 'not a boolean' })
+				}, () => setServer({ cache: {get: () => {}, drop: () => {}} })
+			).then(() => {
+					throw new Error('should not fullfill');
+
+				},
+				() => {})
+	);
+
+	it('fails if assumePromise is not a boolean', () =>
+		setServer({ assumePromise: 'not a boolean' })
 			.then(() => {
 				throw new Error('should not fullfill');
 
-			}, () => {});
+			}, () => {})
 
-	});
+	);
 
-	it('fails if ttl is not a positive integer', () => {
-		return setServer({ ttl: 'not a number' })
+	it('fails if isSecure is not a boolean', () =>
+		setServer({ isSecure: 'not a boolean' })
 			.then(() => {
 				throw new Error('should not fullfill');
 
-			}, () => {
-				return setServer({ ttl: 1.5 });
+			}, () => {})
 
-			}).then(() => {
-				throw new Error('should not fullfill');
+	);
 
-			}, () => {
-				return setServer({ ttl: -1 });
-
-			}).then(() => {
-				throw new Error('should not fullfill');
-
-			}, () => {});
-
-	});
-
-	it('fails if cookie is not a string', () => {
-		return setServer({ cookie: 1234 })
+	it('fails if isHttpOnly is not a boolean', () =>
+		setServer({ isHttpOnly: 'not a boolean' })
 			.then(() => {
 				throw new Error('should not fullfill');
 
-			}, () => {});
+			}, () => {})
 
-	});
+	);
 
-	it('fails if cache is not an object with set,get and drop methods', () => {
-		return setServer({ cache: 'not an object' })
+	it('fails if redirectOnTry is not a boolean', () =>
+		setServer({ redirectOnTry: 'not a boolean' })
 			.then(() => {
 				throw new Error('should not fullfill');
 
-			}, () => {
-				return setServer({ cache: { } });
+			}, () => {})
 
-			}).then(() => {
-				throw new Error('should not fullfill');
+	);
 
-			}, () => {
-				return setServer({ cache: {set: () => {}, get: () => {}} });
-
-			}).then(() => {
-				throw new Error('should not fullfill');
-
-			}, () => {
-				return setServer({ cache: {set: () => {}, drop: () => {}} });
-
-			}).then(() => {
-				throw new Error('should not fullfill');
-
-			}, () => {
-				return setServer({ cache: {get: () => {}, drop: () => {}} });
-
-			}).then(() => {
-				throw new Error('should not fullfill');
-
-			}, () => {});
-	});
-
-	it('fails if assumePromise is not a boolean', () => {
-		return setServer({ assumePromise: 'not a boolean' })
+	it('fails if password is not a string or buffer', () =>
+		setServer({ password: 2432 })
 			.then(() => {
 				throw new Error('should not fullfill');
 
-			}, () => {});
+			}, () => {})
 
-	});
+	);
 
-	it('fails if isSecure is not a boolean', () => {
-		return setServer({ isSecure: 'not a boolean' })
+	it('fails if redirectTo is not a string or empty value', () =>
+		setServer({ redirectTo: 12354 })
 			.then(() => {
-				throw new Error('should not fullfill');
+					throw new Error('should not fullfill');
 
-			}, () => {});
+				}, () => setServer({ redirectTo: true })
+			).then(() => {
+					throw new Error('should not fullfill');
 
-	});
+				},
+				() => {}
+			)
 
-	it('fails if isHttpOnly is not a boolean', () => {
-		return setServer({ isHttpOnly: 'not a boolean' })
-			.then(() => {
-				throw new Error('should not fullfill');
-
-			}, () => {});
-
-	});
-
-	it('fails if redirectOnTry is not a boolean', () => {
-		return setServer({ redirectOnTry: 'not a boolean' })
-			.then(() => {
-				throw new Error('should not fullfill');
-
-			}, () => {});
-
-	});
-
-	it('fails if password is not a string or buffer', () => {
-		return setServer({ password: 2432 })
-			.then(() => {
-				throw new Error('should not fullfill');
-
-			}, () => {});
-
-	});
-
-	it('fails if redirectTo is not a string or empty value', () => {
-		return setServer({ redirectTo: 12354 })
-			.then(() => {
-				throw new Error('should not fullfill');
-
-			}, () => {
-				return setServer({ redirectTo: true });
-
-			}).then(() => {
-				throw new Error('should not fullfill');
-
-			}, () => {});
-
-	});
+	);
 
 	it('fails if validateFunc is not a func', () => {
 		return setServer({ validateFunc: 'not a function' })
@@ -245,36 +225,38 @@ describe('scheme', () => {
 
 	});
 
-	it('fails if appendNext is not a string boolean or empty value', () => {
-		return setServer({ appendNext: 12354 })
+	it('fails if appendNext is not a string boolean or empty value', () =>
+		setServer({ appendNext: 12354 })
 			.then(() => {
-				throw new Error('should not fullfill');
+					throw new Error('should not fullfill');
 
-			}, () => {
-				return setServer({ appendNext: {} });
+				}, () => setServer({ appendNext: {} })
+			).then(() => {
+					throw new Error('should not fullfill');
 
-			}).then(() => {
-				throw new Error('should not fullfill');
+				},
+				() => {}
+			)
 
-			}, () => {});
+	);
 
-	});
-
-	it('fails if path is not a string', () => {
-		return setServer({ path: 12234 })
+	it('fails if path is not a string', () =>
+		setServer({ path: 12234 })
 			.then(() => {
-				throw new Error('should not fullfill');
+					throw new Error('should not fullfill');
 
-			}, () => {});
+				},
+				() => {}
+			)
 
-	});
+	);
 
 
 	it('authenticates a request', () => {
 		let user = { fake: 'user'},
 			resource = {fake: 'resource'};
 		return setServer({ ttl: 60 * 1000, cookie: 'special'})
-			.then((server) => {
+			.then(server => {
 				server.route({
 					method: 'GET', path: '/login/{user}',
 					config: {
@@ -299,7 +281,7 @@ describe('scheme', () => {
 
 				return server.start()
 					.then(() => server.inject('/login/valid'))
-					.then((res) => {
+					.then(res => {
 						let header, cookie;
 						should.exist(res);
 						res.result.should.be.equal('valid');
@@ -309,7 +291,7 @@ describe('scheme', () => {
 						cookie = header[0].match(cookieRegex);
 						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: 'special=' + cookie[1] } });
 
-					}).then((res) => {
+					}).then(res => {
 						res.statusCode.should.be.equal(200);
 						should.not.exist(res.headers['set-cookie']);
 						res.result.should.be.equal(resource);
@@ -319,90 +301,34 @@ describe('scheme', () => {
 			});
 	});
 
-	it.skip('fails over to another strategy if not present', () => {
-
-		const extraSchemePlugin = function (plugin, options, next) {
-
-			const simpleTestSchema = function () {
-
-				return {
-					authenticate: function (request, reply) {
-
-						return reply.continue({ credentials: { test: 'valid' } });
-					}
-				};
-			};
-
-			plugin.auth.scheme('simpleTest', simpleTestSchema);
-			return next();
-		};
-
-		extraSchemePlugin.attributes = {
-			name: 'simpleTestAuth'
-		};
-
-		function validateFunc (request, session, callback) {
-			const override = hoek.clone(session);
-			override.something = 'new';
-
-			return callback(null, session.user === 'valid', override);
-		}
-
-		return setServer({ ttl: 60 * 1000, cookie: 'special', clearInvalid: true, validateFunc: validateFunc})
-			.then((server) => {
+	it('sets session id on initial request', () => {
+		let resource = {fake: 'resource'};
+		return setServer({ ttl: 60 * 1000, cookie: 'special'})
+			.then(server => {
 				server.route({
-					method: 'GET', path: '/login/{user}',
-					config: {
-						auth: { mode: 'try' },
-						handler: function (request, reply) {
-
-							request.auth.session.set({ user: request.params.user });
-							return reply(request.params.user);
-						}
+					method: 'GET', path: '/resource', handler: function (request, reply) {
+						return reply(resource);
 					}
 				});
 
-				return new Promise((resolve, reject) => {
-					server.register(extraSchemePlugin, (err) => {
-						if (err) {
-							reject(err);
+				return server.start()
+					.then(() => server.inject('/resource'))
+					.then(response => {
+						let header, cookie;
+						response.statusCode.should.be.equal(401);
+						response.result.message.should.be.eql('Bad Session');
+						header = response.headers['set-cookie'];
+						header.length.should.be.equal(1);
+						header[0].should.match(/Max-Age=60/);
+						cookie = header[0].match(cookieRegex);
+						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: 'special=' + cookie[1] } });
 
-						}
+					}).then(response => {
+						response.statusCode.should.be.equal(401);
+						response.result.message.should.be.eql('Not authenticated');
 
-						try {
-							server.auth.strategy('simple', 'simpleTest');
+					}).finally(() => server.stop());
 
-						} catch (e) {
-							reject(e);
-
-						}
-
-						resolve(server);
-					});
-
-				});
-			}).then((server) => {
-				server.route({
-						method: 'GET',
-						path: '/multiple',
-						config: {
-							auth: {
-								mode: 'try',
-								strategies: ['default', 'simple']
-							},
-							handler: function (request, reply) {
-
-								const credentialsTest = (request.auth.credentials && request.auth.credentials.test) || 'NOT AUTH';
-								return reply('multiple ' + credentialsTest);
-							}
-						}
-					});
-
-				return server.inject('/multiple');
-			}).then((res) => {
-				should.exist(res);
-				res.result.should.be.equal(200);
-				res.result.should.be.equal('multiple valid');
 			});
 	});
 
@@ -410,7 +336,7 @@ describe('scheme', () => {
 		let user = { fake: 'user'},
 			cookie;
 		return setServer({ ttl: 60 * 1000, cookie: 'special'})
-			.then((server) => {
+			.then(server => {
 				server.route({
 					method: 'GET', path: '/login/{user}',
 					config: {
@@ -434,7 +360,7 @@ describe('scheme', () => {
 
 				return server.start()
 					.then(() => server.inject('/login/valid'))
-					.then((res) => {
+					.then(res => {
 						let header;
 						should.exist(res);
 						res.result.should.be.equal('valid');
@@ -444,12 +370,20 @@ describe('scheme', () => {
 						cookie = header[0].match(cookieRegex);
 						return server.inject({ method: 'GET', url: '/logout', headers: { cookie: 'special=' + cookie[1] } });
 
-					}).then((res) => {
+					}).then(res => {
+						let id,
+							header;
 						res.statusCode.should.be.equal(200);
 						res.result.should.be.equal('logged-out');
-						res.headers['set-cookie'][0].should.be.equal('special=; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure; HttpOnly; Path=/');
+						header = res.headers['set-cookie'];
+						header.length.should.be.equal(1);
+						header[0].should.match(/Max-Age=60/);
+						id = header[0].match(cookieRegex)[1];
+						should.exist(id);
+						id.should.be.ok();
+						id.should.not.be.eql(cookie[1]);
 						return server.inject({ method: 'GET', url: '/logout', headers: { cookie: 'special=' + cookie[1] } });
-					}).then((res) => {
+					}).then(res => {
 						res.statusCode.should.be.equal(401);
 
 					}).finally(() => server.stop());
@@ -458,9 +392,9 @@ describe('scheme', () => {
 
 	});
 
-	it('clear cookie on invalid', () => {
-		return setServer({ ttl: 60 * 1000, cookie: 'special', clearInvalid: true})
-			.then((server) => {
+	it('clear session on invalid id', () => setServer({ ttl: 60 * 1000, cookie: 'special', clearInvalid: true})
+			.then(server => {
+				const id = '123456';
 				server.route({
 					method: 'GET', path: '/', handler: function (request, reply) {
 						reply('ok');
@@ -469,16 +403,76 @@ describe('scheme', () => {
 
 
 				return server.start()
-					.then(() => server.inject({url: '/',  headers: { cookie: 'special=123456' }}))
-					.then((res) => {
+					.then(() => server.inject({url: '/',  headers: { cookie: `special=${id}` }}))
+					.then(res => {
+						let cookie,
+							header;
 						should.exist(res);
 						res.statusCode.should.be.equal(401);
-						res.headers['set-cookie'][0].should.be.equal('special=; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure; HttpOnly; Path=/');
+						header = res.headers['set-cookie'];
+						header.length.should.be.equal(1);
+						header[0].should.match(/Max-Age=60/);
+						cookie = header[0].match(cookieRegex);
+						should.exist(cookie[1]);
+						cookie[1].should.be.ok();
+						cookie[1].should.not.be.eql(id);
+					}).finally(() => server.stop());
+
+			})
+
+	);
+
+	it('uses validateFunc to validate and replace credentials', () => {
+		let user         = { fake: 'user' },
+			resource     = { fake: 'resource' },
+			creds        = { fake: 'creds', user: user },
+			newCreds     = { fake: 'new creds', user: user },
+			validateFunc = sinon.stub().yieldsOn(creds, null, true, newCreds);
+
+		return setServer({ ttl: 60 * 1000, cookie: 'special', validateFunc: validateFunc})
+			.then(server => {
+				server.route({
+					method: 'GET', path: '/login/{user}',
+					config: {
+						auth: { mode: 'try' },
+						handler: function (request, reply) {
+							user.name = request.params.user;
+							request.auth.session.set(creds)
+								.then(() => reply(user.name));
+
+						}
+					}
+				});
+
+				server.route({
+					method: 'GET', path: '/resource', handler: function (request, reply) {
+						should.exist(request.auth.credentials);
+						request.auth.credentials.should.be.eql(newCreds);
+
+						return reply(resource);
+					}
+				});
+
+				return server.start()
+					.then(() => server.inject('/login/valid'))
+					.then(res => {
+						let header, cookie;
+						should.exist(res);
+						res.result.should.be.equal('valid');
+						header = res.headers['set-cookie'];
+						header.length.should.be.equal(1);
+						header[0].should.match(/Max-Age=60/);
+						cookie = header[0].match(cookieRegex);
+						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: 'special=' + cookie[1] } });
+
+					}).then(res => {
+						res.statusCode.should.be.equal(200);
+						should.not.exist(res.headers['set-cookie']);
+						res.result.should.be.equal(resource);
 
 					}).finally(() => server.stop());
 
 			});
-
 	});
 
 	it('fails a request with invalid session', () => {
@@ -489,12 +483,11 @@ describe('scheme', () => {
 		function validateFunc (request, session, callback) {
 			const override = hoek.clone(session);
 			override.something = 'new';
-
 			return callback(null, session.user === 'valid', override);
 		}
 
 		return setServer({ ttl: 60 * 1000, cookie: 'special', clearInvalid: true, validateFunc: validateFunc})
-			.then((server) => {
+			.then(server => {
 				server.route({
 					method: 'GET', path: '/login/{user}',
 					config: {
@@ -519,19 +512,28 @@ describe('scheme', () => {
 
 				return server.start()
 					.then(() => server.inject('/login/invalid'))
-					.then((res) => {
+					.then(response => {
 						let header;
-						should.exist(res);
-						res.result.should.be.equal('invalid');
-						header = res.headers['set-cookie'];
+						should.exist(response);
+						response.result.should.be.equal('invalid');
+						header = response.headers['set-cookie'];
 						header.length.should.be.equal(1);
 						header[0].should.match(/Max-Age=60/);
 						cookie = header[0].match(cookieRegex);
 						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: 'special=' + cookie[1] } });
 
-					}).then((res) => {
-						res.headers['set-cookie'][0].should.be.equal('special=; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure; HttpOnly; Path=/');
-						res.statusCode.should.be.equal(401);
+					}).then(response => {
+						let id,
+							header;
+						response.statusCode.should.be.equal(401);
+						response.result.message.should.be.eql('Invalid credentials');
+						header = response.headers['set-cookie'];
+						header.length.should.be.equal(1);
+						header[0].should.match(/Max-Age=60/);
+						id = header[0].match(cookieRegex)[1];
+						should.exist(id);
+						id.should.be.ok();
+						id.should.not.be.eql(cookie[1]);
 					}).finally(() => server.stop());
 
 			});
@@ -550,7 +552,7 @@ describe('scheme', () => {
 		}
 
 		return setServer({ ttl: 60 * 1000, cookie: 'special', clearInvalid: false, validateFunc: validateFunc})
-			.then((server) => {
+			.then(server => {
 				server.route({
 					method: 'GET', path: '/login/{user}',
 					config: {
@@ -575,7 +577,7 @@ describe('scheme', () => {
 
 				return server.start()
 					.then(() => server.inject('/login/invalid'))
-					.then((res) => {
+					.then(res => {
 						let header;
 						should.exist(res);
 						res.result.should.be.equal('invalid');
@@ -585,7 +587,7 @@ describe('scheme', () => {
 						cookie = header[0].match(cookieRegex);
 						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: 'special=' + cookie[1] } });
 
-					}).then((res) => {
+					}).then(res => {
 						should.not.exist(res.headers['set-cookie']);
 						res.statusCode.should.be.equal(401);
 					}).finally(() => server.stop());
@@ -601,7 +603,7 @@ describe('scheme', () => {
 			cookie;
 
 		return setServer({ ttl: 60 * 1000, cookie: 'special'})
-			.then((server) => {
+			.then(server => {
 				server.route({
 					method: 'GET', path: '/login/{user}',
 					config: {
@@ -629,7 +631,7 @@ describe('scheme', () => {
 
 				return server.start()
 					.then(() => server.inject(`/login/${name}`))
-					.then((res) => {
+					.then(res => {
 						let header;
 						should.exist(res);
 						res.result.should.be.equal(name);
@@ -639,7 +641,7 @@ describe('scheme', () => {
 						cookie = header[0].match(cookieRegex);
 						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: 'special=' + cookie[1] } });
 
-					}).then((res) => {
+					}).then(res => {
 						res.statusCode.should.be.equal(200);
 						res.result.should.be.equal(resource);
 					}).finally(() => server.stop());
@@ -660,7 +662,7 @@ describe('scheme', () => {
 		}
 
 		return setServer({ ttl: 60 * 1000, cookie: 'special', validateFunc: validateFunc})
-			.then((server) => {
+			.then(server => {
 				server.route({
 					method: 'GET', path: '/login/{user}',
 					config: {
@@ -685,7 +687,7 @@ describe('scheme', () => {
 
 				return server.start()
 					.then(() => server.inject(`/login/${name}`))
-					.then((res) => {
+					.then(res => {
 						let header;
 						should.exist(res);
 						res.result.should.be.equal(name);
@@ -695,7 +697,7 @@ describe('scheme', () => {
 						cookie = header[0].match(cookieRegex);
 						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: 'special=' + cookie[1] } });
 
-					}).then((res) => {
+					}).then(res => {
 						res.statusCode.should.be.equal(401);
 					}).finally(() => server.stop());
 
@@ -708,7 +710,7 @@ describe('scheme', () => {
 			user     = { fake: 'user'};
 
 		return setServer({ cookie: 'special', sessionCookie: true})
-			.then((server) => {
+			.then(server => {
 				server.route({
 					method: 'GET', path: '/login/{user}',
 					config: {
@@ -724,7 +726,7 @@ describe('scheme', () => {
 
 				return server.start()
 					.then(() => server.inject(`/login/${name}`))
-					.then((res) => {
+					.then(res => {
 						let header;
 						should.exist(res);
 						res.result.should.be.equal(name);
@@ -744,7 +746,7 @@ describe('scheme', () => {
 			resource = { fake: 'resource'};
 
 		return setServer({ cookie: 'special', ttl: 60 * 1000, path: path })
-			.then((server) => {
+			.then(server => {
 				server.route({
 					method: 'GET', path: `${path}/login/{user}`,
 					config: {
@@ -769,7 +771,7 @@ describe('scheme', () => {
 
 				return server.start()
 					.then(() => server.inject(`${path}/login/${name}`))
-					.then((res) => {
+					.then(res => {
 						let header, cookie;
 						should.exist(res);
 						res.result.should.be.equal(name);
@@ -779,7 +781,7 @@ describe('scheme', () => {
 						header[0].should.match(new RegExp(`Path=${path}`));
 						cookie = header[0].match(cookieRegex);
 						return server.inject({ method: 'GET', url: `${path}/resource`, headers: { cookie: 'special=' + cookie[1] } });
-					}).then((res) => {
+					}).then(res => {
 						res.statusCode.should.be.equal(200);
 						res.result.should.be.equal(resource);
 					}).finally(() => server.stop());
@@ -795,7 +797,7 @@ describe('set()', () => {
 		let name = 'steve';
 
 		return setServer({ ttl: 60 * 1000, cookie: 'special'})
-			.then((server) => {
+			.then(server => {
 				server.route({
 					method: 'GET', path: '/login/{user}',
 					config: {
@@ -814,7 +816,7 @@ describe('set()', () => {
 
 				return server.start()
 					.then(() => server.inject(`/login/${name}`))
-					.then((res) => {
+					.then(res => {
 						should.exist(res);
 						res.result.should.be.equal('Invalid credentials');
 
@@ -847,7 +849,7 @@ describe('clear()', () => {
 			};
 
 		return setServer({ ttl: 60 * 1000, cookie: 'special', cache: cache})
-			.then((server) => {
+			.then(server => {
 				server.route({
 					method: 'GET', path: '/login/{user}',
 					config: {
@@ -874,7 +876,7 @@ describe('clear()', () => {
 
 				return server.start()
 					.then(() => server.inject(`/login/${name}`))
-					.then((res) => {
+					.then(res => {
 						let header, cookie;
 						should.exist(res);
 						res.result.should.be.equal(name);
@@ -884,7 +886,7 @@ describe('clear()', () => {
 						cookie = header[0].match(cookieRegex);
 						should(_cache).have.property(cookie[1]);
 						return server.inject({ method: 'GET', url: '/clearKey', headers: { cookie: 'special=' + cookie[1] } })
-							.then((res) => {
+							.then(res => {
 								res.statusCode.should.be.equal(200);
 								should(_cache).not.have.property(cookie[1]);
 
@@ -902,7 +904,7 @@ describe('redirection', () => {
 	it('sends to login page (uri without query)', () => {
 
 		return setServer({ ttl: 60 * 1000, cookie: 'special', redirectTo: 'http://example.com/login', appendNext: true})
-			.then((server) => {
+			.then(server => {
 				server.route({
 					method: 'GET', path: '/', handler: function (request, reply) {
 						reply('never');
@@ -913,7 +915,7 @@ describe('redirection', () => {
 
 				return server.start()
 					.then(() => server.inject('/'))
-					.then((res) => {
+					.then(res => {
 						res.statusCode.should.be.equal(302);
 						res.headers.should.have.property('location', 'http://example.com/login?next=%2F');
 
@@ -928,7 +930,7 @@ describe('redirection', () => {
 				cookie    : 'special',
 				redirectTo: 'http://example.com/login?mode=1',
 				appendNext: true
-			}).then((server) => {
+			}).then(server => {
 				server.route({
 					method: 'GET', path: '/', handler: function (request, reply) {
 						reply('never');
@@ -939,7 +941,7 @@ describe('redirection', () => {
 
 				return server.start()
 					.then(() => server.inject('/'))
-					.then((res) => {
+					.then(res => {
 						res.statusCode.should.be.equal(302);
 						res.headers.should.have.property('location', 'http://example.com/login?mode=1&next=%2F');
 
@@ -951,7 +953,7 @@ describe('redirection', () => {
 
 	it('skips when redirectTo is set to false', () => {
 		return setServer({ ttl: 60 * 1000, cookie: 'special', redirectTo: false, appendNext: true})
-			.then((server) => {
+			.then(server => {
 				server.route({
 					method: 'GET', path: '/', handler: function (request, reply) {
 						reply('never');
@@ -962,7 +964,7 @@ describe('redirection', () => {
 
 				return server.start()
 					.then(() => server.inject('/'))
-					.then((res) => {
+					.then(res => {
 						res.statusCode.should.be.equal(401);
 
 					}).finally(() => server.stop());
@@ -973,7 +975,7 @@ describe('redirection', () => {
 
 	it('skips when route override', () => {
 		return setServer({ ttl: 60 * 1000, cookie: 'special', redirectTo: 'http://example.com/login', appendNext: true})
-			.then((server) => {
+			.then(server => {
 				server.route({
 					method: 'GET',
 					path: '/',
@@ -993,7 +995,7 @@ describe('redirection', () => {
 
 				return server.start()
 					.then(() => server.inject('/'))
-					.then((res) => {
+					.then(res => {
 						res.statusCode.should.be.equal(401);
 
 					}).finally(() => server.stop());
@@ -1004,7 +1006,7 @@ describe('redirection', () => {
 
 	it('skips when redirectOnTry is false in try mode', () => {
 		return setServer({ ttl: 60 * 1000, cookie: 'special', redirectOnTry: false, redirectTo: 'http://example.com/login', appendNext: true})
-			.then((server) => {
+			.then(server => {
 				server.route({
 					method: 'GET',
 					path: '/',
@@ -1020,7 +1022,7 @@ describe('redirection', () => {
 
 				return server.start()
 					.then(() => server.inject('/'))
-					.then((res) => {
+					.then(res => {
 						res.statusCode.should.be.equal(200);
 						res.result.should.be.equal(false);
 
@@ -1037,7 +1039,7 @@ describe('redirection', () => {
 				cookie    : 'special',
 				redirectTo: 'http://example.com/login?mode=1',
 				appendNext: false
-			}).then((server) => {
+			}).then(server => {
 				server.route({
 					method: 'GET', path: '/', handler: function (request, reply) {
 						reply('never');
@@ -1048,7 +1050,7 @@ describe('redirection', () => {
 
 				return server.start()
 					.then(() => server.inject('/'))
-					.then((res) => {
+					.then(res => {
 						res.statusCode.should.be.equal(302);
 						res.headers.should.have.property('location', 'http://example.com/login?mode=1');
 
@@ -1065,7 +1067,7 @@ describe('redirection', () => {
 				cookie    : 'special',
 				redirectTo: 'http://example.com/login?mode=1',
 				appendNext: next
-			}).then((server) => {
+			}).then(server => {
 				server.route({
 					method: 'GET', path: '/', handler: function (request, reply) {
 						reply('never');
@@ -1076,7 +1078,7 @@ describe('redirection', () => {
 
 				return server.start()
 					.then(() => server.inject('/'))
-					.then((res) => {
+					.then(res => {
 						res.statusCode.should.be.equal(302);
 						res.headers.should.have.property('location', `http://example.com/login?mode=1&${next}=%2F`);
 
@@ -1091,7 +1093,7 @@ describe('redirection', () => {
 				cookie       : 'special',
 				redirectTo   : 'http://example.com/login?mode=1',
 				redirectOnTry: true
-			}).then((server) => {
+			}).then(server => {
 				server.route({
 					method: 'GET', path: '/',
 					config: {
@@ -1106,7 +1108,7 @@ describe('redirection', () => {
 
 				return server.start()
 					.then(() => server.inject('/'))
-					.then((res) => {
+					.then(res => {
 						res.statusCode.should.be.equal(302);
 
 					}).finally(() => server.stop());
