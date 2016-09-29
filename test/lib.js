@@ -1,11 +1,17 @@
 /* globals describe, before, it*/
 "use strict";
-var should  = require('should'),
-	sinon   = require('sinon'),
-	sol     = require('../');
+var Promise      = require('bluebird'),
+	should       = require('should'),
+	sinon        = require('sinon'),
+	sol          = require('../'),
+	uidGenerator = require(process.env.COVER === 'SOL' ? '../lib-cov/uidGenerator' : '../lib/uidGenerator');
+
+require('should-sinon');
 
 describe('Sol lib', function () {
-	var implement,
+
+	describe('onPreAuth', function () {
+		var implement,
 			events = {},
 			fakePlugin = {
 				auth: {
@@ -54,20 +60,15 @@ describe('Sol lib', function () {
 				validateFunc : undefined,
 				appendNext   : '',
 				path         : '/'
-			};
+			},
+			func;
 
-	before(function (done) {
-		sol.register(fakePlugin, {}, function () {
-			implement(fakeServer, settings);
-			done();
-		});
-	});
-
-	describe('onPreAuth', function () {
-		var func;
-		before(function () {
-			func = events.onPreAuth;
-
+		before(function (done) {
+			sol.register(fakePlugin, {}, function () {
+				implement(fakeServer, settings);
+				func = events.onPreAuth;
+				done();
+			});
 		});
 
 		it('should register session auth functions on request', function (done) {
@@ -138,6 +139,65 @@ describe('Sol lib', function () {
 		});
 
 
+	});
+
+	describe('uidGenerator', function () {
+		it('should return a function that generates uid', function () {
+			uidGenerator().should.be.a.Function();
+		});
+
+		describe('generator', function () {
+			it('should return a promise', function () {
+				uidGenerator(1, 0)().should.be.instanceof(Promise);
+			});
+
+			it('should fulfill with the right len uid', function () {
+				return Promise.all([
+						uidGenerator(1, 0)(),
+						uidGenerator(3, 0)(),
+						uidGenerator(6, 0)()
+					]).spread((uid1, uid2, uid3) =>  {
+						uid1.should.have.length(4);
+						uid1.substr(2, 2).should.be.eql('==');
+						uid2.should.have.length(4);
+						uid3.should.have.length(8);
+					});
+			});
+
+			it('should reject if uid exist and no more tries', function () {
+				const generator = uidGenerator(1, 0);
+				let uids = 0;
+				function recGen () {
+					return generator()
+						.then(() => {
+							uids++;
+							if (uids < 256) {
+								return recGen();
+							}
+						});
+				}
+
+				return recGen().should.be.rejected();
+			});
+
+			it('should never return the same uid', function () {
+				const generator = uidGenerator(1, 1000);
+				const uids = [];
+
+				function recGen () {
+					return generator()
+						.then(uid => {
+							uids.indexOf(uid).should.be.eql(-1);
+							uids.push(uid);
+							if (uids.length < 256) {
+								return recGen();
+							}
+						});
+				}
+
+				return recGen();
+			});
+		});
 	});
 
 });

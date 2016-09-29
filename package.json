@@ -25,6 +25,7 @@
     "mocha": "^2.0.1",
     "mocha-istanbul": "^0.2.0",
     "should": "^8.4.0",
+    "should-sinon": "0.0.5",
     "sinon": "^1.17.4"
   },
   "scripts": {
