@@ -19,11 +19,12 @@
     "url": "https://github.com/yonjah/hapi-sol/issues"
   },
   "devDependencies": {
-    "hapi": "8.x.x",
-    "istanbul": "^0.3.2",
+    "eslint": "^3.6.1",
+    "hapi": "13.x.x",
+    "istanbul": "^0.4.3",
     "mocha": "^2.0.1",
     "mocha-istanbul": "^0.2.0",
-    "should": "^4.2.0",
+    "should": "^8.4.0",
     "sinon": "^1.17.4"
   },
   "scripts": {
@@ -35,9 +36,9 @@
   },
   "dependencies": {
     "bluebird": "3.x.x",
-    "boom": "2.x.x",
-    "hoek": "2.x.x",
-    "joi": "^6.x.x"
+    "boom": "3.x.x",
+    "hoek": "4.x.x",
+    "joi": "8.x.x"
   },
   "peerDependencies": {
     "hapi": ">=8.x.x"

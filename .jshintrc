@@ -1,9 +1,0 @@
-{
-	"node"  : true,
-	"esnext": true,
-	"undef" : true,
-	"unused": true,
-	"strict": true,
-	"expr"  : true,
-	"predef": [ "proccess", "-Promise"]
-}
