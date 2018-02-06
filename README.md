@@ -90,7 +90,6 @@ when setting an auth strategy you can set the following options:
 - `cache` caching manager if you don't want to use something else (needs to implement _get_,_set_ and _drop_ methods) __default(undefined)__
 - `validateFunc` A function to farther validate the cookie if needed function signature should be (request, credentials) __default(undefined)__
 - `clearInvalid` If cookie is tested to be invalid by the validateFunc should we clear the existing cookie __default(true)__
-- `assumePromise` if set to true assumes `validateFunc` and `cache` methods will return a promise __default(false)__
 - `sidLength` The length in Bytes for the generated random ID Should be high enough so collision would be impossible __default(36)__
 - `uidRetries` How many retries should be made to generate the ID (in case of collisions or missing entropy) __default(5)__
 - `redirectTo` Location to redirect to in case of auth Error __default(''//Empty string)__

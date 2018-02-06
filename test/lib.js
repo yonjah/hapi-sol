@@ -11,92 +11,86 @@ require('should-sinon');
 describe('Sol lib', function () {
 
 	describe('onPreAuth', function () {
-		var implement,
-			events = {},
-			fakePlugin = {
-				auth: {
-					scheme: function (id, func) {
-						implement = func;
-					}
+		let implement;
+		const events = {};
+		const cache = {
+			set : sinon.stub(),
+			drop: sinon.stub(),
+			get : sinon.stub()
+		};
+		const settings = {
+			cacheId      : '_hapi_session',
+			sidLength    : 36,
+			uidRetries   : 5,
+			clearInvalid : true,
+			ttl          : 1000 * 60 * 60 * 24, // one day
+			cookie       : 'sid',
+			assumePromise: false,
+			isSecure     : true,
+			isHttpOnly   : true,
+			redirectOnTry: true,
+			password     : undefined,
+			redirectTo   : '',
+			validateFunc : undefined,
+			appendNext   : '',
+			path         : '/'
+		};
+		const h = {
+			continue: Symbol('continue')
+		};
+		const fakeServer = {
+			auth: {
+				scheme: function (id, func) {
+					implement = func;
 				}
 			},
-			cache = {
-				set : sinon.stub(),
-				drop: sinon.stub(),
-				get : sinon.stub()
+			cache: function (options) {
+				options.segment.should.be.eql(settings.cacheId);
+				options.expiresIn.should.be.eql(settings.ttl);
+				return cache;
 			},
-			fakeServer = {
-				cache: function (options) {
-					options.segment.should.be.eql(settings.cacheId);
-					options.expiresIn.should.be.eql(settings.ttl);
-					return cache;
-				},
-				state: function (cookieId, options) {
-					cookieId.should.be.eql(settings.cookie);
-					options.encoding.should.be.eql(settings.password ? 'iron' : 'none');
-					options.ttl.should.be.eql(settings.ttl);
-					(options.password === settings.password).should.be.ok;
-					options.isSecure.should.be.eql(settings.isSecure);
-					options.isHttpOnly.should.be.eql(settings.isHttpOnly);
-					options.path.should.be.eql(settings.path);
-				},
-				ext: function (eventKey, func) {
-					func.should.be.a.Function;
-					events[eventKey] = func;
-				}
-			}, settings = {
-				cacheId      : '_hapi_session',
-				sidLength    : 36,
-				uidRetries   : 5,
-				clearInvalid : true,
-				ttl          : 1000 * 60 * 60 * 24, // one day
-				cookie       : 'sid',
-				assumePromise: false,
-				isSecure     : true,
-				isHttpOnly   : true,
-				redirectOnTry: true,
-				password     : undefined,
-				redirectTo   : '',
-				validateFunc : undefined,
-				appendNext   : '',
-				path         : '/'
+			state: function (cookieId, options) {
+				cookieId.should.be.eql(settings.cookie);
+				options.encoding.should.be.eql(settings.password ? 'iron' : 'none');
+				options.ttl.should.be.eql(settings.ttl);
+				(options.password === settings.password).should.be.ok;
+				options.isSecure.should.be.eql(settings.isSecure);
+				options.isHttpOnly.should.be.eql(settings.isHttpOnly);
+				options.path.should.be.eql(settings.path);
 			},
-			func;
+			ext: function (eventKey, func) {
+				func.should.be.a.Function;
+				events[eventKey] = func;
+			}
+		};
 
-		before(function (done) {
-			sol.register(fakePlugin, {}, function () {
-				implement(fakeServer, {});
-				func = events.onPreAuth;
-				done();
-			});
-		});
+		sol.register(fakeServer, {});
+		implement(fakeServer, {});
+		const func = events.onPreAuth;
 
-		it('should register session auth functions on request', function (done) {
+		it('should register session auth functions on request', async function () {
 			var request = { auth: {}};
-			func(request, {continue: function () {
-				request.auth.should.have.property('session');
-				request.auth.session.should.have.keys('getId', 'setSession', 'getSession' , 'set', 'clear');
-
-				done();
-			}});
-
+			const res = await func(request, h);
+			res.should.be.equal(h.continue);
+			request.auth.should.have.property('session');
+			request.auth.session.should.have.keys('getId', 'setSession', 'getSession' , 'set', 'clear');
 		});
 
 		describe('session.getId', function () {
+			let implement;
+
 			const events = {};
-			const fakePlugin = {
-				auth: {
-					scheme (id, func) {
-						implement = func;
-					}
-				}
-			};
 			const cache = {
 				set : sinon.stub(),
 				drop: sinon.stub(),
 				get : sinon.stub()
 			};
 			const fakeServer = {
+				auth: {
+					scheme (id, func) {
+						implement = func;
+					}
+				},
 				cache () {
 					return cache;
 				},
@@ -110,21 +104,11 @@ describe('Sol lib', function () {
 
 			const request = { state: {sid: sid}, auth: {}};
 
-			let implement,
-				session;
-
-
-			before(function (done) {
-				sol.register(fakePlugin, {}, function () {
-					implement(fakeServer, settings);
-					events.onPreAuth(request, {continue: function () {
-						request.auth.should.have.property('session');
-						session = request.auth.session;
-						done();
-					}});
-				});
-
-			});
+			sol.register(fakeServer, {});
+			implement(fakeServer, settings);
+			events.onPreAuth(request, {});
+			request.auth.should.have.property('session');
+			const session = request.auth.session;
 
 
 			it('should return session id if valid', function () {
@@ -139,20 +123,19 @@ describe('Sol lib', function () {
 		});
 
 		describe('session.clear', function () {
+			let implement;
 			const events = {};
-			const fakePlugin = {
+			const cache = {
+				set : sinon.stub().resolves(true),
+				drop: sinon.stub().resolves(true),
+				get : sinon.stub().resolves(true)
+			};
+			const fakeServer = {
 				auth: {
 					scheme (id, func) {
 						implement = func;
 					}
-				}
-			};
-			const cache = {
-				set : sinon.stub().yields(null, true),
-				drop: sinon.stub().yields(null, true),
-				get : sinon.stub().yields(null, true)
-			};
-			const fakeServer = {
+				},
 				cache () {
 					return cache;
 				},
@@ -163,239 +146,172 @@ describe('Sol lib', function () {
 			};
 			const settings = { cookie: 'sid' };
 			const sid = Math.random().toString(32).substr(2, 10);
-			const reply = {
+			const h = {
 				unstate: sinon.stub(),
 				state: sinon.stub()
 			};
 
 			const request = { state: {sid: sid}, auth: {}};
 
-			let implement,
-				session;
+			sol.register(fakeServer, {});
+			implement(fakeServer, settings);
 
+			events.onPreAuth(request, h);
+			request.auth.should.have.property('session');
+			const session = request.auth.session;
 
-			before(function (done) {
-				sol.register(fakePlugin, {}, function () {
-					implement(fakeServer, settings);
-					reply.continue = () => {
-						request.auth.should.have.property('session');
-						session = request.auth.session;
-						done();
-					};
-					events.onPreAuth(request, reply);
-				});
+			it('should destroy session and replace id', async function () {
+				cache.drop.resolves(true);
 
+				await session.clear();
+				let id = session.getId();
+				should.exist(id);
+				id.should.not.be.eql(sid);
+				h.unstate.should.be.calledWith(settings.cookie);
+				h.state.should.be.calledWith(settings.cookie, id);
 			});
 
-
-			it('should destroy session and replace id', function () {
-				cache.drop.yields(null, true);
-
-				return session.clear()
-					.then(() => {
-						let id = session.getId();
-						should.exist(id);
-						id.should.not.be.eql(sid);
-						reply.unstate.should.be.calledWith(settings.cookie);
-						reply.state.should.be.calledWith(settings.cookie, id);
-					});
-			});
-
-			it('should not drop session if no sid', function () {
+			it('should not drop session if no sid', async function () {
 				var ses = {fake: 'session'};
 				request.state.sid = {fake: 'not valid session'};
-				cache.drop.yields(new Error('fake Error'));
-				cache.set.yields(null, ses);
-				return session.clear()
-					.then(res => {
-						res.should.be.eql(ses);
-					}).should.be.fulfilled();
+				cache.drop.rejects(new Error('fake Error'));
+				cache.set.resolves(ses);
+				const res = await session.clear();
+				res.should.be.eql(ses);
 			});
 
 		});
 
 		describe('session.getSession', function () {
-			var implement,
-				events = {},
-				fakePlugin = {
-					auth: {
-						scheme (id, func) {
-							implement = func;
-						}
+			let implement;
+			const events = {};
+			const cache = {
+				set : sinon.stub().resolves(true),
+				drop: sinon.stub().resolves(true),
+				get : sinon.stub().resolves(true)
+			};
+			const fakeServer = {
+				auth: {
+					scheme (id, func) {
+						implement = func;
 					}
 				},
-				cache = {
-					set : sinon.stub(),
-					drop: sinon.stub(),
-					get : sinon.stub()
+				cache () {
+					return cache;
 				},
-				fakeServer = {
-					cache () {
-						return cache;
-					},
-					state () {},
-					ext (eventKey, func) {
-						events[eventKey] = func;
-					}
-				},
-				settings = {},
-				session,
-				sid = Math.random().toString(32).substr(2, 10),
-				request = { state: {sid: sid}, auth: {}};
+				state () {},
+				ext (eventKey, func) {
+					events[eventKey] = func;
+				}
+			};
+			const settings = { cookie: 'sid' };
+			const sid = Math.random().toString(32).substr(2, 10);
+			const h = {
+				unstate: sinon.stub(),
+				state: sinon.stub()
+			};
 
-			before(function (done) {
-				sol.register(fakePlugin, {}, function () {
-					implement(fakeServer, settings);
-					events.onPreAuth(request, {continue: function () {
-						request.auth.should.have.property('session');
-						session = request.auth.session;
-						done();
-					}});
-				});
+			const request = { state: {sid: sid}, auth: {}};
 
+			sol.register(fakeServer, {});
+			implement(fakeServer, settings);
+
+			events.onPreAuth(request, h);
+			request.auth.should.have.property('session');
+			const session = request.auth.session;
+
+			it('should be call cache.get with sid and resolve with Promise', async function () {
+				const res = {fake: 'cache'};
+				cache.get.resolves(res);
+				const item = await session.getSession();
+				cache.get.should.be.calledWith(sid);
+				item.should.be.eql(res);
 			});
 
-			it('should be call cache.get with sid and resolve with Promise/callbacks', function (done) {
-				var res = {fake: 'cache'};
-				cache.get.yields(null, res, {item: res});
-				return session.getSession()
-					.then(function (item) {
-						cache.get.should.be.calledWith(sid);
-						item.should.be.eql(res);
-						session.getSession(function (err, item) {
-							try {
-								should.not.exist(err);
-								item.should.be.eql(res);
-								done();
-							} catch (e) {
-								done(e);
-							}
-						});
-					}).catch(done);
-			});
+			it('should reject with Promise', async function () {
+				const res = new Error('FAKE ERROR');
+				cache.get.rejects(res);
 
-			it('should reject with Promise/callbacks', function (done) {
-				var res = new Error('FAKE ERROR');
-				cache.get.yields(res);
-
-
-				return session.getSession()
-					.then(function () {
-						throw new Error('Promise Should not be resolved');
-					}, function (err) {
-						err.cause.should.be.eql(res);
-						session.getSession(function (err, item) {
-							try {
-								err.cause.should.be.eql(res);
-								should.not.exist(item);
-								done();
-							} catch (e) {
-								done(e);
-							}
-						});
-					}).catch(done);
+				try {
+					await session.getSession();
+					throw new Error('Promise Should not be resolved');
+				} catch (err) {
+					err.should.be.eql(res);
+				}
 			});
 
 
-			it('should not be called with bad sid', function () {
-				var res = new Error('FAKE ERROR');
-				cache.get.yields(res);
+			it('should not be called with bad sid', async function () {
+				const err = new Error('FAKE ERROR');
+				cache.get.rejects(err);
 
 				request.state.sid = {fake: 'not valid session'};
 
-				return session.getSession()
-					.then(function (res) {
-						should.not.exist(res);
-					});
+				const res = await session.getSession();
+				should.not.exist(res);
 			});
 
 		});
 
 
 		describe('session.setSession', function () {
-			var implement,
-				events = {},
-				fakePlugin = {
-					auth: {
-						scheme (id, func) {
-							implement = func;
-						}
+			let implement;
+			const events = {};
+			const cache = {
+				set : sinon.stub().resolves(true),
+				drop: sinon.stub().resolves(true),
+				get : sinon.stub().resolves(true)
+			};
+			const fakeServer = {
+				auth: {
+					scheme (id, func) {
+						implement = func;
 					}
 				},
-				cache = {
-					set : sinon.stub(),
-					drop: sinon.stub(),
-					get : sinon.stub()
+				cache () {
+					return cache;
 				},
-				fakeServer = {
-					cache () {
-						return cache;
-					},
-					state () {},
-					ext (eventKey, func) {
-						events[eventKey] = func;
-					}
-				},
-				settings = {},
-				session,
-				sid = Math.random().toString(32).substr(2, 10);
+				state () {},
+				ext (eventKey, func) {
+					events[eventKey] = func;
+				}
+			};
+			const settings = { cookie: 'sid' };
+			const sid = Math.random().toString(32).substr(2, 10);
+			const h = {
+				unstate: sinon.stub(),
+				state: sinon.stub()
+			};
 
-			before(function (done) {
-				var request = { state: {sid: sid}, auth: {}};
-				sol.register(fakePlugin, {}, function () {
-					implement(fakeServer, settings);
-					events.onPreAuth(request, {continue: function () {
-						request.auth.should.have.property('session');
-						session = request.auth.session;
-						done();
-					}});
-				});
+			const request = { state: {sid: sid}, auth: {}};
 
-			});
+			sol.register(fakeServer, {});
+			implement(fakeServer, settings);
+
+			events.onPreAuth(request, h);
+			request.auth.should.have.property('session');
+			const session = request.auth.session;
 
 
-			it('should be call cache.set with sid and resolve with Promise/callbacks', function (done) {
+			it('should be call cache.set with sid and resolve with Promise', async function () {
 				let ses = {fake: 'session'};
-				cache.set.yields(null, ses);
-				return session.setSession(ses)
-					.then(function (item) {
-						cache.set.should.be.calledWith(sid, ses);
-						item.should.be.eql(ses);
-						ses = {fake: 'session2'};
-						cache.set.yields(null, ses);
-						session.setSession(ses, function (err, item) {
-							try {
-								should.not.exist(err);
-								item.should.be.eql(ses);
-								done();
-							} catch (e) {
-								done(e);
-							}
-						});
-					}).catch(done);
+				cache.set.resolves(ses);
+				const item = await session.setSession(ses);
+				cache.set.should.be.calledWith(sid, ses);
+				item.should.be.eql(ses);
 			});
 
-			it('should reject with Promise/callbacks', function (done) {
+			it('should reject with Promise', async function () {
 				const res = new Error('FAKE ERROR');
 				let ses = {fake: 'session'};
-				cache.set.yields(res);
+				cache.set.rejects(res);
 
-
-				return session.setSession(ses)
-					.then(function () {
-						throw new Error('Promise Should not be resolved');
-					}, function (err) {
-						err.cause.should.be.eql(res);
-						session.setSession(ses, function (err, item) {
-							try {
-								err.cause.should.be.eql(res);
-								should.not.exist(item);
-								done();
-							} catch (e) {
-								done(e);
-							}
-						});
-					}).catch(done);
+				try {
+					await session.setSession(ses);
+					throw new Error('Promise Should not be resolved');
+				} catch (err) {
+					err.should.be.eql(res);
+				}
 			});
 
 		});
@@ -410,7 +326,7 @@ describe('Sol lib', function () {
 
 		describe('generator', function () {
 			it('should return a promise', function () {
-				uidGenerator(1, 0)().should.be.instanceof(Promise);
+				uidGenerator(1, 0)().should.be.instanceof(global.Promise);
 			});
 
 			it('should fulfill with the right len uid', function () {

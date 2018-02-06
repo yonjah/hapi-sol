@@ -1,50 +1,69 @@
 "use strict";
-var should      = require('should'),
-	sinon       = require('sinon'),
-	sol         = require('../'),
-	hapi        = require('hapi'),
-	hoek        = require('hoek'),
-	Promise     = require("bluebird"),
-	cookieRegex = /(?:[^\x00-\x20\(\)<>@\,;\:\\"\/\[\]\?\=\{\}\x7F]+)\s*=\s*(?:([^\x00-\x20\"\,\;\\\x7F]*))/;
+const should  = require('should');
+const sinon   = require('sinon');
+const hapi    = require('hapi');
+const hoek    = require('hoek');
+const Promise = require('bluebird');
+const sol     = require('../');
+
+const cookieRegex = /(?:[^()<>@,;:\\"/[\]?={}\x7F]+)\s*=\s*(?:([^",;\\\x7F]*))/;
 
 
-function promisifyInject (server) {
-	var inject  = server.inject;
-	server.inject = function (options) {
-		return new Promise(function (resolve) {
-			inject.call(server, options, resolve);
-		});
-	};
+async function setServer (options) {
+	var server = new hapi.Server();
+	const start = server.start;
+	server.start = () => Promise.try(() => start.apply(server));
+	await server.register(sol);
+	server.auth.strategy('default', 'session', options);
+	server.auth.default('default');
+	return server;
 }
 
+function testResponse (code, response) {
+	try {
+		response.statusCode.should.eql(code);
+	} catch (e) {
+		let err = new Error(e);
+		if (response.request.response._error) {
+			throw response.request.response._error;
+		} else {
+			err.message += ' ' + JSON.stringify(response.result);
+		}
+		throw err;
+	}
+}
 
-function setServer (options) {
-	var server = new hapi.Server();
-	server.connection();
-	promisifyInject(server);
-	server.start = Promise.promisify(server.start, {context: server});
-	server.stop = Promise.promisify(server.stop, {context: server});
-	return new Promise((resolve, reject) => {
-		server.register(sol, err => {
-			if (err) {
-				reject(err);
+function addRoutes (server, user, resource) {
+	addLoginRoute(server, user);
+	addResourceRoute(server, user, resource);
+}
+
+function addLoginRoute (server, user) {
+	server.route({
+		method: 'GET', path: '/login/{user}',
+		config: {
+			auth: { mode: 'try' },
+			handler: async function (request) {
+				user.name = request.params.user;
+				await request.auth.session.set({ user: user });
+				return user.name;
 
 			}
-
-			try {
-				server.auth.strategy('default', 'session', true, options);
-
-			} catch (e) {
-				reject(e);
-
-			}
-
-			resolve(server);
-
-		});
-
+		}
 	});
+}
 
+function addResourceRoute (server, user, resource) {
+	server.route({
+		method: 'GET',
+		path: '/resource',
+		handler: function (request) {
+			should.exist(request.auth.credentials);
+			request.auth.credentials.should.have.property('user', user);
+
+			return resource;
+		}
+	});
 }
 
 describe('scheme', () => {
@@ -216,14 +235,11 @@ describe('scheme', () => {
 
 	);
 
-	it('fails if validateFunc is not a func', () => {
-		return setServer({ validateFunc: 'not a function' })
+	it('fails if validateFunc is not a func', () => setServer({ validateFunc: 'not a function' })
 			.then(() => {
 				throw new Error('should not fullfill');
 
-			}, () => {});
-
-	});
+			}, () => {}));
 
 	it('fails if appendNext is not a string boolean or empty value', () =>
 		setServer({ appendNext: 12354 })
@@ -257,27 +273,7 @@ describe('scheme', () => {
 			resource = {fake: 'resource'};
 		return setServer({ ttl: 60 * 1000, cookie: 'special'})
 			.then(server => {
-				server.route({
-					method: 'GET', path: '/login/{user}',
-					config: {
-						auth: { mode: 'try' },
-						handler: function (request, reply) {
-							user.name = request.params.user;
-							request.auth.session.set({ user: user })
-								.then(() => reply(user.name));
-
-						}
-					}
-				});
-
-				server.route({
-					method: 'GET', path: '/resource', handler: function (request, reply) {
-						should.exist(request.auth.credentials);
-						request.auth.credentials.should.have.property('user', user);
-
-						return reply(resource);
-					}
-				});
+				addRoutes(server, user, resource);
 
 				return server.start()
 					.then(() => server.inject('/login/valid'))
@@ -292,7 +288,7 @@ describe('scheme', () => {
 						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: 'special=' + cookie[1] } });
 
 					}).then(res => {
-						res.statusCode.should.be.equal(200);
+						testResponse(200, res);
 						should.not.exist(res.headers['set-cookie']);
 						res.result.should.be.equal(resource);
 
@@ -306,8 +302,8 @@ describe('scheme', () => {
 		return setServer({ ttl: 60 * 1000, cookie: 'special'})
 			.then(server => {
 				server.route({
-					method: 'GET', path: '/resource', handler: function (request, reply) {
-						return reply(resource);
+					method: 'GET', path: '/resource', handler: function () {
+						return resource;
 					}
 				});
 
@@ -315,7 +311,7 @@ describe('scheme', () => {
 					.then(() => server.inject('/resource'))
 					.then(response => {
 						let header, cookie;
-						response.statusCode.should.be.equal(401);
+						testResponse(401, response);
 						response.result.message.should.be.eql('Bad Session');
 						header = response.headers['set-cookie'];
 						header.length.should.be.equal(1);
@@ -324,8 +320,40 @@ describe('scheme', () => {
 						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: 'special=' + cookie[1] } });
 
 					}).then(response => {
-						response.statusCode.should.be.equal(401);
+						testResponse(401, response);
 						response.result.message.should.be.eql('Not authenticated');
+
+					}).finally(() => server.stop());
+
+			});
+	});
+
+	it('should work with encrypted cookies encrypts session cookie', () => {
+		const user = { fake: 'user'};
+		const resource = {fake: 'resource'};
+		const sidLength = 10;
+		return setServer({ ttl: 60 * 1000, sidLength, cookie: 'encrypted', password: 'test' + Array(32).join('a')})
+			.then(server => {
+				addRoutes(server, user, resource);
+
+
+				return server.start()
+					.then(() => server.inject('/login/valid'))
+					.then(res => {
+						let header, cookie;
+						should.exist(res);
+						res.result.should.be.equal('valid');
+						header = res.headers['set-cookie'];
+						header.length.should.be.equal(1);
+						header[0].should.match(/Max-Age=60/);
+						cookie = header[0].match(cookieRegex);
+						cookie[1].should.startWith('Fe');
+						cookie[1].length.should.be.above(sidLength * 4);
+						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: 'encrypted=' + cookie[1] } });
+					}).then(res => {
+						testResponse(200, res);
+						should.not.exist(res.headers['set-cookie']);
+						res.result.should.be.equal(resource);
 
 					}).finally(() => server.stop());
 
@@ -337,24 +365,12 @@ describe('scheme', () => {
 			cookie;
 		return setServer({ ttl: 60 * 1000, cookie: 'special'})
 			.then(server => {
-				server.route({
-					method: 'GET', path: '/login/{user}',
-					config: {
-						auth: { mode: 'try' },
-						handler: function (request, reply) {
-							user.name = request.params.user;
-							request.auth.session.set({ user: user })
-								.then(() => reply(user.name));
-
-						}
-					}
-				});
+				addLoginRoute(server, user);
 
 				server.route({
-					method: 'GET', path: '/logout', handler: function (request, reply) {
-
-						request.auth.session.clear()
-							.then(() => reply('logged-out'));
+					method: 'GET', path: '/logout', handler: async function (request) {
+						await request.auth.session.clear();
+						return 'logged-out';
 					}
 				});
 
@@ -373,7 +389,7 @@ describe('scheme', () => {
 					}).then(res => {
 						let id,
 							header;
-						res.statusCode.should.be.equal(200);
+						testResponse(200, res);
 						res.result.should.be.equal('logged-out');
 						header = res.headers['set-cookie'];
 						header.length.should.be.equal(1);
@@ -384,7 +400,7 @@ describe('scheme', () => {
 						id.should.not.be.eql(cookie[1]);
 						return server.inject({ method: 'GET', url: '/logout', headers: { cookie: 'special=' + cookie[1] } });
 					}).then(res => {
-						res.statusCode.should.be.equal(401);
+						testResponse(401, res);
 
 					}).finally(() => server.stop());
 
@@ -396,9 +412,7 @@ describe('scheme', () => {
 			.then(server => {
 				const id = '123456';
 				server.route({
-					method: 'GET', path: '/', handler: function (request, reply) {
-						reply('ok');
-					}
+					method: 'GET', path: '/', handler: () => 'ok'
 				});
 
 
@@ -408,7 +422,7 @@ describe('scheme', () => {
 						let cookie,
 							header;
 						should.exist(res);
-						res.statusCode.should.be.equal(401);
+						testResponse(401, res);
 						header = res.headers['set-cookie'];
 						header.length.should.be.equal(1);
 						header[0].should.match(/Max-Age=60/);
@@ -427,7 +441,9 @@ describe('scheme', () => {
 			resource     = { fake: 'resource' },
 			creds        = { fake: 'creds', user: user },
 			newCreds     = { fake: 'new creds', user: user },
-			validateFunc = sinon.stub().yieldsOn(creds, null, true, newCreds);
+			validateFunc = sinon.stub()
+				.resolves([false])
+				.withArgs(creds).resolves([true, newCreds]);
 
 		return setServer({ ttl: 60 * 1000, cookie: 'special', validateFunc: validateFunc})
 			.then(server => {
@@ -435,21 +451,20 @@ describe('scheme', () => {
 					method: 'GET', path: '/login/{user}',
 					config: {
 						auth: { mode: 'try' },
-						handler: function (request, reply) {
+						handler: async function (request) {
 							user.name = request.params.user;
-							request.auth.session.set(creds)
-								.then(() => reply(user.name));
+							await request.auth.session.set(creds);
+							return user.name;
 
 						}
 					}
 				});
 
 				server.route({
-					method: 'GET', path: '/resource', handler: function (request, reply) {
+					method: 'GET', path: '/resource', handler: function (request) {
 						should.exist(request.auth.credentials);
 						request.auth.credentials.should.be.eql(newCreds);
-
-						return reply(resource);
+						return resource;
 					}
 				});
 
@@ -466,7 +481,7 @@ describe('scheme', () => {
 						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: 'special=' + cookie[1] } });
 
 					}).then(res => {
-						res.statusCode.should.be.equal(200);
+						testResponse(200, res);
 						should.not.exist(res.headers['set-cookie']);
 						res.result.should.be.equal(resource);
 
@@ -480,35 +495,15 @@ describe('scheme', () => {
 			resource = { fake: 'resource'},
 			cookie;
 
-		function validateFunc (request, session, callback) {
+		function validateFunc (request, session) {
 			const override = hoek.clone(session);
 			override.something = 'new';
-			return callback(null, session.user === 'valid', override);
+			return [session.user === 'valid', override];
 		}
 
 		return setServer({ ttl: 60 * 1000, cookie: 'special', clearInvalid: true, validateFunc: validateFunc})
 			.then(server => {
-				server.route({
-					method: 'GET', path: '/login/{user}',
-					config: {
-						auth: { mode: 'try' },
-						handler: function (request, reply) {
-							user.name = request.params.user;
-							request.auth.session.set({ user: user })
-								.then(() => reply(user.name));
-
-						}
-					}
-				});
-
-				server.route({
-					method: 'GET', path: '/resource', handler: function (request, reply) {
-						should.exist(request.auth.credentials);
-						request.auth.credentials.should.have.property('user', user);
-
-						return reply(resource);
-					}
-				});
+				addRoutes(server, user, resource);
 
 				return server.start()
 					.then(() => server.inject('/login/invalid'))
@@ -525,7 +520,7 @@ describe('scheme', () => {
 					}).then(response => {
 						let id,
 							header;
-						response.statusCode.should.be.equal(401);
+						testResponse(401, response);
 						response.result.message.should.be.eql('Invalid credentials');
 						header = response.headers['set-cookie'];
 						header.length.should.be.equal(1);
@@ -544,36 +539,16 @@ describe('scheme', () => {
 			resource = { fake: 'resource'},
 			cookie;
 
-		function validateFunc (request, session, callback) {
+		function validateFunc (request, session) {
 			const override = hoek.clone(session);
 			override.something = 'new';
 
-			return callback(null, session.user === 'valid', override);
+			return [session.user === 'valid', override];
 		}
 
 		return setServer({ ttl: 60 * 1000, cookie: 'special', clearInvalid: false, validateFunc: validateFunc})
 			.then(server => {
-				server.route({
-					method: 'GET', path: '/login/{user}',
-					config: {
-						auth: { mode: 'try' },
-						handler: function (request, reply) {
-							user.name = request.params.user;
-							request.auth.session.set({ user: user })
-								.then(() => reply(user.name));
-
-						}
-					}
-				});
-
-				server.route({
-					method: 'GET', path: '/resource', handler: function (request, reply) {
-						should.exist(request.auth.credentials);
-						request.auth.credentials.should.have.property('user', user);
-
-						return reply(resource);
-					}
-				});
+				addRoutes(server, user, resource);
 
 				return server.start()
 					.then(() => server.inject('/login/invalid'))
@@ -589,7 +564,7 @@ describe('scheme', () => {
 
 					}).then(res => {
 						should.not.exist(res.headers['set-cookie']);
-						res.statusCode.should.be.equal(401);
+						testResponse(401, res);
 					}).finally(() => server.stop());
 
 			});
@@ -608,24 +583,20 @@ describe('scheme', () => {
 					method: 'GET', path: '/login/{user}',
 					config: {
 						auth: { mode: 'try' },
-						handler: function (request, reply) {
-							request.auth.session.set({ user: hoek.merge({name: request.params.user}, user)})
-								.then(() => reply(request.params.user));
+						handler: async function (request) {
+							await request.auth.session.set({ user: hoek.merge({name: request.params.user}, user)});
+							return request.params.user;
 
 						}
 					}
 				});
 
 				server.route({
-					method: 'GET', path: '/resource', handler: function (request, reply) {
-						try {
-							should.exist(request.auth.credentials);
-							request.auth.credentials.should.have.property('user');
-							request.auth.credentials.user.should.have.property('name', name);
-						} catch (e) {
-							return reply(e);
-						}
-						return reply(resource);
+					method: 'GET', path: '/resource', handler: function (request) {
+						should.exist(request.auth.credentials);
+						request.auth.credentials.should.have.property('user');
+						request.auth.credentials.user.should.have.property('name', name);
+						return resource;
 					}
 				});
 
@@ -642,7 +613,7 @@ describe('scheme', () => {
 						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: 'special=' + cookie[1] } });
 
 					}).then(res => {
-						res.statusCode.should.be.equal(200);
+						testResponse(200, res);
 						res.result.should.be.equal(resource);
 					}).finally(() => server.stop());
 
@@ -656,34 +627,14 @@ describe('scheme', () => {
 			resource = { fake: 'resource'},
 			cookie;
 
-		function validateFunc (request, session, callback) {
-			return callback(new Error('boom'));
+		function validateFunc (/*request, session*/) {
+			throw new Error('boom');
 
 		}
 
 		return setServer({ ttl: 60 * 1000, cookie: 'special', validateFunc: validateFunc})
 			.then(server => {
-				server.route({
-					method: 'GET', path: '/login/{user}',
-					config: {
-						auth: { mode: 'try' },
-						handler: function (request, reply) {
-							user.name = request.params.user;
-							request.auth.session.set({ user: user })
-								.then(() => reply(user.name));
-
-						}
-					}
-				});
-
-				server.route({
-					method: 'GET', path: '/resource', handler: function (request, reply) {
-						should.exist(request.auth.credentials);
-						request.auth.credentials.should.have.property('user', user);
-
-						return reply(resource);
-					}
-				});
+				addRoutes(server, user, resource);
 
 				return server.start()
 					.then(() => server.inject(`/login/${name}`))
@@ -696,9 +647,8 @@ describe('scheme', () => {
 						header[0].should.match(/Max-Age=60/);
 						cookie = header[0].match(cookieRegex);
 						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: 'special=' + cookie[1] } });
-
 					}).then(res => {
-						res.statusCode.should.be.equal(401);
+						testResponse(401, res);
 					}).finally(() => server.stop());
 
 			});
@@ -711,18 +661,7 @@ describe('scheme', () => {
 
 		return setServer({ cookie: 'special', sessionCookie: true})
 			.then(server => {
-				server.route({
-					method: 'GET', path: '/login/{user}',
-					config: {
-						auth: { mode: 'try' },
-						handler: function (request, reply) {
-							user.name = request.params.user;
-							request.auth.session.set({ user: user })
-								.then(() => reply(user.name));
-
-						}
-					}
-				});
+				addLoginRoute(server, user);
 
 				return server.start()
 					.then(() => server.inject(`/login/${name}`))
@@ -751,21 +690,21 @@ describe('scheme', () => {
 					method: 'GET', path: `${path}/login/{user}`,
 					config: {
 						auth: { mode: 'try' },
-						handler: function (request, reply) {
+						handler: async function (request) {
 							user.name = request.params.user;
-							request.auth.session.set({ user: user })
-								.then(() => reply(user.name));
+							await request.auth.session.set({ user: user });
+							return user.name;
 
 						}
 					}
 				});
 
 				server.route({
-					method: 'GET', path: `${path}/resource`, handler: function (request, reply) {
+					method: 'GET', path: `${path}/resource`, handler: function (request) {
 						should.exist(request.auth.credentials);
 						request.auth.credentials.should.have.property('user', user);
 
-						return reply(resource);
+						return resource;
 					}
 				});
 
@@ -782,7 +721,7 @@ describe('scheme', () => {
 						cookie = header[0].match(cookieRegex);
 						return server.inject({ method: 'GET', url: `${path}/resource`, headers: { cookie: 'special=' + cookie[1] } });
 					}).then(res => {
-						res.statusCode.should.be.equal(200);
+						testResponse(200, res);
 						res.result.should.be.equal(resource);
 					}).finally(() => server.stop());
 
@@ -802,12 +741,13 @@ describe('set()', () => {
 					method: 'GET', path: '/login/{user}',
 					config: {
 						auth: { mode: 'try' },
-						handler: function (request, reply) {
-							request.auth.session.set(undefined)
-								.then(
-									() => reply('ok'),
-									(e) => reply(e.message || 'ok')
-								);
+						handler: async function (request) {
+							try {
+								await request.auth.session.set(undefined);
+								return 'ok';
+							} catch (e) {
+								return e.message || 'ok';
+							}
 
 						}
 					}
@@ -835,41 +775,27 @@ describe('clear()', () => {
 			user = { fake: 'user'},
 			_cache = Object.create(null),
 			cache  = {
-				set: function (key, value, ttl, cb) {
+				set: function (key, value/*, ttl*/) {
 					_cache[key] = value;
-					cb(null, true);
+					return true;
 				},
-				get: function (key, cb) {
-					cb(null, _cache[key], !!_cache[key]);
+				get: function (key) {
+					return _cache[key];
 				},
-				drop: function (key, cb) {
+				drop: function (key) {
 					delete _cache[key];
-					cb(null, true);
+					return true;
 				}
 			};
 
 		return setServer({ ttl: 60 * 1000, cookie: 'special', cache: cache})
 			.then(server => {
-				server.route({
-					method: 'GET', path: '/login/{user}',
-					config: {
-						auth: { mode: 'try' },
-						handler: function (request, reply) {
-							user.name = request.params.user;
-							request.auth.session.set({ user: user })
-								.then(() => reply(user.name));
-
-						}
-					}
-				});
+				addLoginRoute(server, user);
 
 				server.route({
-					method: 'GET', path: '/clearKey', handler: function (request, reply) {
-
-						request.auth.session.clear()
-							.then(() => {
-								reply();
-							});
+					method: 'GET', path: '/clearKey', handler: async function (request) {
+						await request.auth.session.clear();
+						return null;
 					}
 				});
 
@@ -887,7 +813,7 @@ describe('clear()', () => {
 						should(_cache).have.property(cookie[1]);
 						return server.inject({ method: 'GET', url: '/clearKey', headers: { cookie: 'special=' + cookie[1] } })
 							.then(res => {
-								res.statusCode.should.be.equal(200);
+								testResponse(200, res);
 								should(_cache).not.have.property(cookie[1]);
 
 							});
@@ -901,88 +827,66 @@ describe('clear()', () => {
 
 describe('redirection', () => {
 
-	it('sends to login page (uri without query)', () => {
-
-		return setServer({ ttl: 60 * 1000, cookie: 'special', redirectTo: 'http://example.com/login', appendNext: true})
+	it('sends to login page (uri without query)', () => setServer({ ttl: 60 * 1000, cookie: 'special', redirectTo: 'http://example.com/login', appendNext: true})
 			.then(server => {
 				server.route({
-					method: 'GET', path: '/', handler: function (request, reply) {
-						reply('never');
-
-					}
+					method: 'GET', path: '/', handler: () => 'never'
 				});
 
 
 				return server.start()
 					.then(() => server.inject('/'))
 					.then(res => {
-						res.statusCode.should.be.equal(302);
+						testResponse(302, res);
 						res.headers.should.have.property('location', 'http://example.com/login?next=%2F');
 
 					}).finally(() => server.stop());
 
-			});
-	});
+			}));
 
-	it('sends to login page (uri with query)', () => {
-		return setServer({
+	it('sends to login page (uri with query)', () => setServer({
 				ttl       : 60 * 1000,
 				cookie    : 'special',
 				redirectTo: 'http://example.com/login?mode=1',
 				appendNext: true
 			}).then(server => {
 				server.route({
-					method: 'GET', path: '/', handler: function (request, reply) {
-						reply('never');
-
-					}
+					method: 'GET', path: '/', handler: () => 'never'
 				});
 
 
 				return server.start()
 					.then(() => server.inject('/'))
 					.then(res => {
-						res.statusCode.should.be.equal(302);
+						testResponse(302, res);
 						res.headers.should.have.property('location', 'http://example.com/login?mode=1&next=%2F');
 
 					}).finally(() => server.stop());
 
-			});
+			}));
 
-	});
-
-	it('skips when redirectTo is set to false', () => {
-		return setServer({ ttl: 60 * 1000, cookie: 'special', redirectTo: false, appendNext: true})
+	it('skips when redirectTo is set to false', () => setServer({ ttl: 60 * 1000, cookie: 'special', redirectTo: false, appendNext: true})
 			.then(server => {
 				server.route({
-					method: 'GET', path: '/', handler: function (request, reply) {
-						reply('never');
-
-					}
+					method: 'GET', path: '/', handler: () => 'never'
 				});
 
 
 				return server.start()
 					.then(() => server.inject('/'))
 					.then(res => {
-						res.statusCode.should.be.equal(401);
+						testResponse(401, res);
 
 					}).finally(() => server.stop());
 
-			});
+			}));
 
-	});
-
-	it('skips when route override', () => {
-		return setServer({ ttl: 60 * 1000, cookie: 'special', redirectTo: 'http://example.com/login', appendNext: true})
+	it('skips when route override', () => setServer({ ttl: 60 * 1000, cookie: 'special', redirectTo: 'http://example.com/login', appendNext: true})
 			.then(server => {
 				server.route({
 					method: 'GET',
 					path: '/',
-					handler: function (request, reply) {
-
-						return reply('never');
-					},
+					handler: () => 'never',
 					config: {
 						plugins: {
 							'session': {
@@ -996,16 +900,13 @@ describe('redirection', () => {
 				return server.start()
 					.then(() => server.inject('/'))
 					.then(res => {
-						res.statusCode.should.be.equal(401);
+						testResponse(401, res);
 
 					}).finally(() => server.stop());
 
-			});
+			}));
 
-	});
-
-	it('skips when redirectOnTry is false in try mode', () => {
-		return setServer({ ttl: 60 * 1000, cookie: 'special', redirectOnTry: false, redirectTo: 'http://example.com/login', appendNext: true})
+	it('skips when redirectOnTry is false in try mode', () => setServer({ ttl: 60 * 1000, cookie: 'special', redirectOnTry: false, redirectTo: 'http://example.com/login', appendNext: true})
 			.then(server => {
 				server.route({
 					method: 'GET',
@@ -1013,8 +914,8 @@ describe('redirection', () => {
 					config: {
 						auth: { mode: 'try' }
 					},
-					handler: function (request, reply) {
-						return reply(request.auth.isAuthenticated);
+					handler: function (request) {
+						return request.auth.isAuthenticated;
 
 					}
 				});
@@ -1023,42 +924,34 @@ describe('redirection', () => {
 				return server.start()
 					.then(() => server.inject('/'))
 					.then(res => {
-						res.statusCode.should.be.equal(200);
+						testResponse(200, res);
 						res.result.should.be.equal(false);
 
 					}).finally(() => server.stop());
 
-			});
-
-	});
+			}));
 
 
-	it('sends to login page and does not append the next query when appendNext is false', () => {
-		return setServer({
+	it('sends to login page and does not append the next query when appendNext is false', () => setServer({
 				ttl       : 60 * 1000,
 				cookie    : 'special',
 				redirectTo: 'http://example.com/login?mode=1',
 				appendNext: false
 			}).then(server => {
 				server.route({
-					method: 'GET', path: '/', handler: function (request, reply) {
-						reply('never');
-
-					}
+					method: 'GET', path: '/', handler: () => 'never'
 				});
 
 
 				return server.start()
 					.then(() => server.inject('/'))
 					.then(res => {
-						res.statusCode.should.be.equal(302);
+						testResponse(302, res);
 						res.headers.should.have.property('location', 'http://example.com/login?mode=1');
 
 					}).finally(() => server.stop());
 
-			});
-
-	});
+			}));
 
 	it('appends the custom query when appendNext is string', () => {
 		let next = 'done';
@@ -1069,17 +962,14 @@ describe('redirection', () => {
 				appendNext: next
 			}).then(server => {
 				server.route({
-					method: 'GET', path: '/', handler: function (request, reply) {
-						reply('never');
-
-					}
+					method: 'GET', path: '/', handler: () => 'never'
 				});
 
 
 				return server.start()
 					.then(() => server.inject('/'))
 					.then(res => {
-						res.statusCode.should.be.equal(302);
+						testResponse(302, res);
 						res.headers.should.have.property('location', `http://example.com/login?mode=1&${next}=%2F`);
 
 					}).finally(() => server.stop());
@@ -1087,8 +977,7 @@ describe('redirection', () => {
 			});
 	});
 
-	it('redirect on try', () => {
-		return setServer({
+	it('redirect on try', () => setServer({
 				ttl          : 60 * 1000,
 				cookie       : 'special',
 				redirectTo   : 'http://example.com/login?mode=1',
@@ -1099,21 +988,16 @@ describe('redirection', () => {
 					config: {
 						auth: {mode: 'try'}
 					},
-					handler: function (request, reply) {
-						reply('never');
-
-					}
+					handler: () => 'never'
 				});
 
 
 				return server.start()
 					.then(() => server.inject('/'))
 					.then(res => {
-						res.statusCode.should.be.equal(302);
+						testResponse(302, res);
 
 					}).finally(() => server.stop());
 
-			});
-
-	});
+			}));
 });
