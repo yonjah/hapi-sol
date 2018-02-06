@@ -33,7 +33,7 @@
     "test": "ENVIRONMENT=test mocha test",
     "test-xml": "ENVIRONMENT=test mocha --reporter xunit test > result.xml",
     "cover": "nyc --reporter=lcov --reporter=text mocha test",
-    "lint": "eslint lib/ test/"
+    "lint": "eslint lib/ test/ examples/"
   },
   "dependencies": {
     "boom": "7.x.x",

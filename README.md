@@ -8,18 +8,15 @@ As with the original scheme a lot of the code was gratuitously stolen from the h
 This Module will save a cookie with a unique session ID, the ID has high entropy and is randomly secure so it should be impossible to fake. all other data is never sent to the user so you can save in the session whatever information you wont without the fear of it being faked or compromised.
 
 ## Usage
-**For Hapi 7.0.0 see [previous version](https://github.com/yonjah/hapi-sol/tree/v0.2.2-7)**
-
+**For Hapi 16.x and lower see [previous version](https://github.com/yonjah/hapi-sol/tree/v0.6.0)**
 For demo server example usage see the [server.js](https://github.com/yonjah/hapi-session/blob/master/examples/server.js)
 
 
 ### Loading the module
 ```javascript
-server.register(require('hapi-sol'), function cb (err) {
-	server.auth.strategy('session', 'session', true, {
-		// Options Object
-	});
-});
+await server.register({plugin: require('hapi-sol')});
+server.auth.strategy('session', 'session', {/* Options Object*/});
+server.auth.default('session');
 ```
 
 
@@ -27,9 +24,8 @@ server.register(require('hapi-sol'), function cb (err) {
 After validating the user credentials saving them to the cookie is done by the session.set
 method
 ```javascript
-request.auth.session.set({'logined': true, 'userid': 1}, function () {
-	return reply.redirect('/');
-});
+await request.auth.session.set({'logined': true, 'userid': 1});
+return h.response('You are being redirected...').takeover().redirect('/');
 ```
 notice this method is asynchronous.
 once the user is logged in you will have the credentials passed to the set method available in future connections at -
@@ -39,36 +35,32 @@ console.log(request.auth.credentials); //{'logined': true, 'userid': 1}
 
 To logout the user you can either call set with null value or call the clear method
 ```javascript
-return request.auth.session.set(null, function () {
-    return reply.redirect('/');
-});
+await request.auth.session.set(null);
+return h.response('You are being redirected...').takeover().redirect('/');
 //
-return request.auth.session.clear(function () {
-	return reply.redirect('/');
-});
+await request.auth.session.clear();
+return h.response('You are being redirected...').takeover().redirect('/');
 ```
 the `clear` method will completely remove the session from cache and create a new one while the `set` method will leave the current session active but unauthenticated. As with the `set` method `clear` is asynchronous.
 
-## Extra methods on request.auth.session
+## Synchronous methods on request.auth.session
 `request.auth.session.getId` returns the current session ID
 
-`request.auth.session.getSeesion(cb)` returns the current session object
+## Asynchronous methods on request.auth.session
+`request.auth.session.getSeesion` returns the current session object
 
-`request.auth.session.setSeesion(session, cb)` save `session` as the current session object
+`request.auth.session.setSeesion(session)` save `session` as the current session object
 
 since clients will always have an active persistent session it can be useful to attach some extra data to the session object
 
 ```javascript
 //on failed login attempt
-return request.auth.session.getSession()
-    .then((session) => {
-        session.attempts = session.attempts ? session.attempts + 1: 1;
-        if (session.attempts > 5) {
-            //block user ip
-        } else {
-            return request.auth.session.setSession(session);
-        }
-    });
+const session = await request.auth.session.getSession();
+session.attempts = session.attempts ? session.attempts + 1: 1;
+await request.auth.session.setSession(session);
+if (session.attempts > 5) {
+    //block user ip
+}
 ```
 
 Notice that the `session` Object has two internally used properties

@@ -1,13 +1,9 @@
 "use strict";
-var hapi    = require('hapi'),
-	sol     = require('../'),
-	server  = new hapi.Server({debug: {request: ['error']}});
+const hapi    = require('hapi');
+const sol     = require('../');
+const server  = new hapi.Server({port: 8000, debug: {request: ['error']}});
 
-server.connection({
-	port: 8000
-});
-
-var users = {
+const users = {
 	john: {
 		id: 'john',
 		password: 'password',
@@ -15,17 +11,28 @@ var users = {
 	}
 };
 
-var home = function (request, reply) {
-	reply('<html><head><title>Login page</title></head><body><h3>Welcome ' + request.auth.credentials.name + '!</h3><br/><form method="get" action="/logout">' + '<input type="submit" value="Logout">' + '</form></body></html>');
-};
+function home (request) {
+	return `<html>
+	<head>
+		<title>Login page</title>
+	</head>
+	<body>
+		<h3>Welcome ${request.auth.credentials.name}!</h3>
+		<br/>
+		<form method="get" action="/logout">
+			<input type="submit" value="Logout">
+		</form>
+	</body>
+</html>`;
+}
 
-var login = function (request, reply) {
+async function login (request, h) {
 	if (request.auth.isAuthenticated) {
-		return reply.redirect('/');
+		return h.response('You are being redirected...').takeover().redirect('/');
 	}
 
-	var message = '';
-	var account = null;
+	let message = '',
+		account = null;
 
 	if (request.method === 'post') {
 
@@ -40,57 +47,71 @@ var login = function (request, reply) {
 	}
 
 	if (request.method === 'get' || message) {
-		return reply('<html><head><title>Login page</title></head><body>' + (message ? '<h3>' + message + '</h3><br/>' : '') + '<form method="post" action="/login">' + 'Username: <input type="text" name="username"><br>' + 'Password: <input type="password" name="password"><br/>' + '<input type="submit" value="Login"></form></body></html>');
+		return `<html>
+	<head>
+		<title>Login page</title>
+	</head>
+	<body>
+	${message ? '<h3>' + message + '</h3><br/>' : ''}
+	<form method="post" action="/login">
+		Username: <input type="text" name="username"><br/>
+		Password: <input type="password" name="password"><br/>
+		<input type="submit" value="Login">
+	</form>
+	</body>
+</html>`;
 	} else {
-		return request.auth.session.set(account, function () {
-			return reply.redirect('/');
-		});
+		await request.auth.session.set(account);
+		return h.response('You are being redirected...').takeover().redirect('/');
 	}
-};
+}
 
-var logout = function (request, reply) {
-	return request.auth.session.clear(function () {
-		return reply.redirect('/');
-	});
-};
+async function logout (request, h) {
+	await request.auth.session.clear();
+	return h.response('You are being redirected...').takeover().redirect('/');
+}
 
-server.register(sol, function (err) {
-	server.auth.strategy('session', 'session', true, {
+
+async function initServer () {
+	await server.register({plugin: sol});
+	server.auth.strategy('session', 'session', {
 		password: undefined,
 		cookie: 'sid-example',
 		redirectTo: '/login',
 		isSecure: false
 	});
-});
+	server.auth.default('session');
 
-server.route([{
-	method: 'GET',
-	path: '/',
-	config: {
-		handler: home
-	}
-}, {
-	method: ['GET', 'POST'],
-	path: '/login',
-	config: {
-		handler: login,
-		auth: {
-			mode: 'try'
-		},
-		plugins: {
-			'sol': {
-				redirectTo: false
+	server.route([{
+		method: 'GET',
+		path: '/',
+		config: {
+			handler: home
+		}
+	}, {
+		method: ['GET', 'POST'],
+		path: '/login',
+		config: {
+			handler: login,
+			auth: {
+				mode: 'try'
+			},
+			plugins: {
+				'sol': {
+					redirectTo: false
+				}
 			}
 		}
-	}
-}, {
-	method: 'GET',
-	path: '/logout',
-	config: {
-		handler: logout
-	}
-}]);
+	}, {
+		method: 'GET',
+		path: '/logout',
+		config: {
+			handler: logout
+		}
+	}]);
 
-server.start(function () {
-	console.log('Server ready !!!');
-});
+	await server.start();
+	console.log('Server ready !!!'); //eslint-disable-line no-console
+}
+
+initServer();
