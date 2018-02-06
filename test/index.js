@@ -6,7 +6,7 @@ const hoek    = require('hoek');
 const Promise = require('bluebird');
 const sol     = require('../');
 
-const cookieRegex = /(?:[^\x00-\x20\(\)<>@\,;\:\\"\/\[\]\?\=\{\}\x7F]+)\s*=\s*(?:([^\x00-\x20\"\,\;\\\x7F]*))/;
+const cookieRegex = /(?:[^()<>@,;:\\"/[\]?={}\x7F]+)\s*=\s*(?:([^",;\\\x7F]*))/;
 
 
 async function setServer (options) {
@@ -235,14 +235,11 @@ describe('scheme', () => {
 
 	);
 
-	it('fails if validateFunc is not a func', () => {
-		return setServer({ validateFunc: 'not a function' })
+	it('fails if validateFunc is not a func', () => setServer({ validateFunc: 'not a function' })
 			.then(() => {
 				throw new Error('should not fullfill');
 
-			}, () => {});
-
-	});
+			}, () => {}));
 
 	it('fails if appendNext is not a string boolean or empty value', () =>
 		setServer({ appendNext: 12354 })
@@ -830,9 +827,7 @@ describe('clear()', () => {
 
 describe('redirection', () => {
 
-	it('sends to login page (uri without query)', () => {
-
-		return setServer({ ttl: 60 * 1000, cookie: 'special', redirectTo: 'http://example.com/login', appendNext: true})
+	it('sends to login page (uri without query)', () => setServer({ ttl: 60 * 1000, cookie: 'special', redirectTo: 'http://example.com/login', appendNext: true})
 			.then(server => {
 				server.route({
 					method: 'GET', path: '/', handler: () => 'never'
@@ -847,11 +842,9 @@ describe('redirection', () => {
 
 					}).finally(() => server.stop());
 
-			});
-	});
+			}));
 
-	it('sends to login page (uri with query)', () => {
-		return setServer({
+	it('sends to login page (uri with query)', () => setServer({
 				ttl       : 60 * 1000,
 				cookie    : 'special',
 				redirectTo: 'http://example.com/login?mode=1',
@@ -870,12 +863,9 @@ describe('redirection', () => {
 
 					}).finally(() => server.stop());
 
-			});
+			}));
 
-	});
-
-	it('skips when redirectTo is set to false', () => {
-		return setServer({ ttl: 60 * 1000, cookie: 'special', redirectTo: false, appendNext: true})
+	it('skips when redirectTo is set to false', () => setServer({ ttl: 60 * 1000, cookie: 'special', redirectTo: false, appendNext: true})
 			.then(server => {
 				server.route({
 					method: 'GET', path: '/', handler: () => 'never'
@@ -889,12 +879,9 @@ describe('redirection', () => {
 
 					}).finally(() => server.stop());
 
-			});
+			}));
 
-	});
-
-	it('skips when route override', () => {
-		return setServer({ ttl: 60 * 1000, cookie: 'special', redirectTo: 'http://example.com/login', appendNext: true})
+	it('skips when route override', () => setServer({ ttl: 60 * 1000, cookie: 'special', redirectTo: 'http://example.com/login', appendNext: true})
 			.then(server => {
 				server.route({
 					method: 'GET',
@@ -917,12 +904,9 @@ describe('redirection', () => {
 
 					}).finally(() => server.stop());
 
-			});
+			}));
 
-	});
-
-	it('skips when redirectOnTry is false in try mode', () => {
-		return setServer({ ttl: 60 * 1000, cookie: 'special', redirectOnTry: false, redirectTo: 'http://example.com/login', appendNext: true})
+	it('skips when redirectOnTry is false in try mode', () => setServer({ ttl: 60 * 1000, cookie: 'special', redirectOnTry: false, redirectTo: 'http://example.com/login', appendNext: true})
 			.then(server => {
 				server.route({
 					method: 'GET',
@@ -945,13 +929,10 @@ describe('redirection', () => {
 
 					}).finally(() => server.stop());
 
-			});
-
-	});
+			}));
 
 
-	it('sends to login page and does not append the next query when appendNext is false', () => {
-		return setServer({
+	it('sends to login page and does not append the next query when appendNext is false', () => setServer({
 				ttl       : 60 * 1000,
 				cookie    : 'special',
 				redirectTo: 'http://example.com/login?mode=1',
@@ -970,9 +951,7 @@ describe('redirection', () => {
 
 					}).finally(() => server.stop());
 
-			});
-
-	});
+			}));
 
 	it('appends the custom query when appendNext is string', () => {
 		let next = 'done';
@@ -998,8 +977,7 @@ describe('redirection', () => {
 			});
 	});
 
-	it('redirect on try', () => {
-		return setServer({
+	it('redirect on try', () => setServer({
 				ttl          : 60 * 1000,
 				cookie       : 'special',
 				redirectTo   : 'http://example.com/login?mode=1',
@@ -1021,7 +999,5 @@ describe('redirection', () => {
 
 					}).finally(() => server.stop());
 
-			});
-
-	});
+			}));
 });
