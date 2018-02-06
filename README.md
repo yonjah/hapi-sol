@@ -94,5 +94,5 @@ when setting an auth strategy you can set the following options:
 - `uidRetries` How many retries should be made to generate the ID (in case of collisions or missing entropy) __default(5)__
 - `redirectTo` Location to redirect to in case of auth Error __default(''//Empty string)__
 - `appendNext` if truthy will add a query parameter with the same name in the redirection url back to the current route boolean true will set the name 'next' __default(''//Empty string)__
-- `redirectOnTry` if mode is set to try and auth fails redirect the request __default(true)__
+- `redirectOnTry` if mode is set to try and auth fails redirect the request __default(false)__
 
