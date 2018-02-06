@@ -1,76 +1,66 @@
 /* globals describe, before, it, beforeEach*/
 "use strict";
-var should  = require('should'),
-	sol     = require('../'),
-	hapi    = require('hapi'),
-	Promise = require("bluebird"),
-	port    = 3000;
+const should = require('should');
+const sol    = require('../');
+const hapi   = require('hapi');
 
-
-function replaceInject (server) {
-	var inject  = server.inject;
-	server.inject = function (options) {
-		return new Promise(function (resolve) {
-			inject.call(server, options, resolve);
-		});
-	};
-}
+let port = 3000;
 
 describe('Sol Server Auth', function () {
-	var call    = false,
-		options = {},
-		server  = new hapi.Server();
+	const options = {};
+	const server  = new hapi.Server({ port: ++port });
 
-	server.connection({ port: ++port });
-	replaceInject(server);
+	let call    = false;
 
-	before(function (done) {
-		server.register(sol, function (/*err*/) {
-			server.auth.strategy('session', 'session', true, options);
-			server.route([
-				{
-					method: 'GET',
-					path: '/',
-					config: {
-						handler: function (request, reply) {
-							call = true;
-							reply();
-						}
-					}
-				}, {
-					method: 'GET',
-					path: '/login',
-					config: {
-						handler: function (request, reply) {
-							if (!request.auth.credentials) {
-								return request.auth.session.set({ fake: 'creds'})
-									.then(reply);
-							}
-							reply();
-						},
-						auth: {
-							strategy: 'session',
-							mode    : 'try'
-						}
-					}
-				}, {
-					method: 'GET',
-					path: '/logout',
-					config: {
-						handler: function (request, reply) {
-							return request.auth.session.clear()
-								.then(reply);
-						},
-						auth: {
-							strategy: 'session',
-							mode    : 'try'
-						}
+	before(async function () {
+		await server.register(sol);
+		server.auth.strategy('session', 'session', options);
+		server.auth.default('session');
+		server.route([
+			{
+				method: 'GET',
+				path: '/',
+				config: {
+					handler: function () {
+						call = true;
+						return null;
 					}
 				}
-			]);
+			}, {
+				method: 'GET',
+				path: '/login',
+				config: {
+					handler: async function (request) {
+						if (!request.auth.credentials) {
+							await request.auth.session.set({ fake: 'creds'});
+						}
+						return null;
+					},
+					auth: {
+						strategy: 'session',
+						mode    : 'try'
+					}
+				}
+			}, {
+				method: 'GET',
+				path: '/logout',
+				config: {
+					handler: async function (request) {
+						await request.auth.session.clear();
+						return null;
+					},
+					auth: {
+						strategy: 'session',
+						mode    : 'try'
+					}
+				}
+			}
+		]);
+		await server.start();
+	});
 
-			server.start(done);
-		});
+	after(async function () {
+		await server.stop();
 	});
 
 	beforeEach(function () {

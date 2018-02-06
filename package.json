@@ -19,27 +19,26 @@
     "url": "https://github.com/yonjah/hapi-sol/issues"
   },
   "devDependencies": {
-    "eslint": "^3.6.1",
-    "hapi": "13.x.x",
-    "istanbul": "^0.4.3",
-    "mocha": "^2.0.1",
-    "mocha-istanbul": "^0.2.0",
-    "should": "^8.4.0",
-    "should-sinon": "0.0.5",
-    "sinon": "^1.17.4"
+    "bluebird": "3.x.x",
+    "eslint": "^4.17.0",
+    "hapi": "^17.x.x",
+    "mocha": "^5.0.0",
+    "mocha-istanbul": "^0.3.0",
+    "nyc": "^11.4.1",
+    "should": "^13.2.1",
+    "should-sinon": "0.0.6",
+    "sinon": "^4.2.2"
   },
   "scripts": {
-    "test": "ENVIRONMENT=test ./node_modules/mocha/bin/mocha test",
-    "test-xml": "ENVIRONMENT=test ./node_modules/mocha/bin/mocha --reporter xunit test > result.xml",
-    "cov": "npm run lib-cov &&  ENVIRONMENT=test ISTANBUL_REPORTERS=html,text-summary  COVER=SOL ./node_modules/mocha/bin/mocha --timeout=20000 --reporter mocha-istanbul",
-    "clean": "rm -rf lib-cov cobertura-coverage.xml coverage; true",
-    "lib-cov": "npm run clean && ./node_modules/istanbul/lib/cli.js instrument --output lib-cov --no-compact --variable global.__coverage__ lib"
+    "test": "ENVIRONMENT=test mocha test",
+    "test-xml": "ENVIRONMENT=test mocha --reporter xunit test > result.xml",
+    "cover": "nyc --reporter=lcov --reporter=text mocha test",
+    "lint": "eslint lib/ test/"
   },
   "dependencies": {
-    "bluebird": "3.x.x",
-    "boom": "3.x.x",
-    "hoek": "4.x.x",
-    "joi": "8.x.x"
+    "boom": "7.x.x",
+    "hoek": "5.x.x",
+    "joi": "13.x.x"
   },
   "peerDependencies": {
     "hapi": ">=8.x.x"

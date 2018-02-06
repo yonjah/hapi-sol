@@ -1,59 +1,50 @@
 /* globals describe, it*/
 "use strict";
+const sol  = require('../');
+const name = 'sol';
+const id   = 'session';
+const should = require('should');
 
-var should  = require('should'),
-	sol     = require('../'),
-	name    = 'sol',
-	id      = 'session';
 
 describe('Sol Plugin API', function () {
 	it('should expose a register function', function () {
+		sol.should.have.property('register');
 		sol.register.should.be.a.Function;
 	});
 
-	it('should have the name attribute `sol`', function () {
-		sol.register.attributes.should.be.ok;
-		sol.register.attributes.name.should.be.eql(name);
+	it('should have the name `sol`', function () {
+		sol.should.have.property('name', name);
 	});
 
 	describe('Register function', function () {
-		var schemeCall = false,
-			schemeId   = null,
-			schemeFunc = null,
-			fakePlugin = {
+		it('should register the Scheme', function () {
+			let schemeCall = false;
+
+			sol.register({
 				auth: {
-					scheme: function (id, func) {
+					scheme: function (schemeId, func) {
 						schemeCall = true;
-						schemeId   = id;
-						schemeFunc = func;
+						schemeId.should.be.eql(id);
+						should.exist(func);
+						func.should.be.Function();
 					}
 				}
-			};
-
-
-		it('should register the Scheme', function () {
-			var nextCall = false;
-			sol.register(fakePlugin, {}, function () {
-				nextCall = true;
 			});
+			schemeCall.should.be.ok();
 
-			nextCall.should.be.ok;
-			schemeCall.should.be.ok;
-			schemeId.should.be.eql(id);
-			schemeFunc.should.be.a.Function;
 		});
+
 	});
 
 	describe('Implement function', function () {
 		var implement,
 			events = {},
-			fakePlugin = {
+			fakeServer = {
 				auth: {
 					scheme: function (id, func) {
 						implement = func;
 					}
-				}
-			}, fakeServer = {
+				},
 				cache: function (options) {
 					options.segment.should.be.eql(settings.cacheId);
 					options.expiresIn.should.be.eql(settings.ttl);
@@ -83,7 +74,6 @@ describe('Sol Plugin API', function () {
 				clearInvalid : true,
 				ttl          : 1000 * 60 * 60 * 24, // one day
 				cookie       : 'sid',
-				assumePromise: false,
 				isSecure     : true,
 				isHttpOnly   : true,
 				redirectOnTry: true,
@@ -94,7 +84,7 @@ describe('Sol Plugin API', function () {
 				path         : '/'
 			};
 
-		sol.register(fakePlugin, {}, function () {});
+		sol.register(fakeServer, {}, function () {});
 
 		it('should return a scheme', function () {
 			var scheme = implement(fakeServer, settings);

@@ -1,1 +1,2 @@
-module.exports = require(process.env.COVER==='SOL'? './lib-cov' : './lib');
+'use strict';
+module.exports = require('./lib');

@@ -1,4 +1,4 @@
 node_modules
 
-lib-cov
-html-report
+coverage
+.nyc_output
