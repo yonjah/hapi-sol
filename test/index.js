@@ -1,4 +1,5 @@
 "use strict";
+const crypto  = require('crypto');
 const should  = require('should');
 const sinon   = require('sinon');
 const hapi    = require('hapi');
@@ -358,6 +359,225 @@ describe('scheme', () => {
 					}).finally(() => server.stop());
 
 			});
+	});
+
+	it('should work with secret to create local HMAC of seesion id', () => {
+		const user = { fake: 'user'};
+		const resource = {fake: 'resource'};
+		const sidLength = 12;
+		const cache  = {
+			_cache : [],
+			async set (key, value/*, ttl*/) {
+				this._cache[key] = value;
+				return true;
+			},
+			async get (key) {
+				return this._cache[key];
+			},
+			async drop (key) {
+				delete this._cache[key];
+				return true;
+			}
+		};
+		const hmacAlgo = 'sha1';
+		const secret   = 'secret';
+		return setServer({ ttl: 60 * 1000, sidLength, secret, cache, hmacAlgo})
+			.then(server => {
+				addRoutes(server, user, resource);
+
+
+				return server.start()
+					.then(() => server.inject('/login/valid'))
+					.then(res => {
+						let header, cookie;
+						should.exist(res);
+						res.result.should.be.equal('valid');
+						header = res.headers['set-cookie'];
+						header.length.should.be.equal(1);
+						header[0].should.match(/Max-Age=60/);
+						cookie = header[0].match(cookieRegex);
+						cookie[1].length.should.be.eql(Math.ceil(sidLength / 3 * 4));
+						cache._cache.should.not.containEql(cookie[1]);
+						cache._cache.should.not.containEql(res.request.auth.session.id);
+						res.request.auth.session.id.should.be.eql(
+							crypto.createHmac(hmacAlgo, secret)
+								.update(cookie[1])
+								.update(res.request.info.remoteAddress)
+								.update(res.request.headers['user-agent'])
+								.digest('base64')
+						);
+						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: `sid=${cookie[1]}` } });
+					}).then(res => {
+						testResponse(200, res);
+						should.not.exist(res.headers['set-cookie']);
+						res.result.should.be.equal(resource);
+
+					}).finally(() => server.stop());
+
+			});
+	});
+
+	it('should create HMAC with custom hmacAlgo and hmacRequest', () => {
+		const user = { fake: 'user'};
+		const resource = {fake: 'resource'};
+		const sidLength = 12;
+		const cache  = {
+			_cache : [],
+			async set (key, value/*, ttl*/) {
+				this._cache[key] = value;
+				return true;
+			},
+			async get (key) {
+				return this._cache[key];
+			},
+			async drop (key) {
+				delete this._cache[key];
+				return true;
+			}
+		};
+		const hmacAlgo = 'sha256';
+		const secret   = 'secret';
+		return setServer({ ttl: 60 * 1000, sidLength, secret, cache, hmacAlgo, hmacRequest: ['headers.host']})
+			.then(server => {
+				addRoutes(server, user, resource);
+
+				return server.start()
+					.then(() => server.inject('/login/valid'))
+					.then(res => {
+						let header, cookie;
+						should.exist(res);
+						res.result.should.be.equal('valid');
+						header = res.headers['set-cookie'];
+						header.length.should.be.equal(1);
+						header[0].should.match(/Max-Age=60/);
+						cookie = header[0].match(cookieRegex);
+						cookie[1].length.should.be.eql(Math.ceil(sidLength / 3 * 4));
+						cache._cache.should.not.containEql(cookie[1]);
+						cache._cache.should.not.containEql(res.request.auth.session.id);
+						res.request.auth.session.id.should.be.eql(
+							crypto.createHmac(hmacAlgo, secret)
+								.update(cookie[1])
+								.update(res.request.headers.host)
+								.digest('base64')
+						);
+						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: `sid=${cookie[1]}` } });
+					}).then(res => {
+						testResponse(200, res);
+						should.not.exist(res.headers['set-cookie']);
+						res.result.should.be.equal(resource);
+
+					}).finally(() => server.stop());
+
+			});
+	});
+
+	it('should create HMAC with nonexisting  and custom headers', () => {
+		const user = { fake: 'user'};
+		const resource = {fake: 'resource'};
+		const sidLength = 12;
+		const cache  = {
+			_cache : [],
+			async set (key, value/*, ttl*/) {
+				this._cache[key] = value;
+				return true;
+			},
+			async get (key) {
+				return this._cache[key];
+			},
+			async drop (key) {
+				delete this._cache[key];
+				return true;
+			}
+		};
+		const hmacAlgo = 'sha1';
+		const secret   = 'secret';
+		return setServer({ ttl: 60 * 1000, sidLength, secret, cache, hmacAlgo, hmacRequest: ['headers.nonexisting', 'headers.x-custom']})
+			.then(server => {
+				addRoutes(server, user, resource);
+
+				return server.start()
+					.then(() => server.inject('/login/valid'))
+					.then(res => {
+						let header, cookie;
+						should.exist(res);
+						res.result.should.be.equal('valid');
+						header = res.headers['set-cookie'];
+						header.length.should.be.equal(1);
+						header[0].should.match(/Max-Age=60/);
+						cookie = header[0].match(cookieRegex);
+						cookie[1].length.should.be.eql(Math.ceil(sidLength / 3 * 4));
+						cache._cache.should.not.containEql(cookie[1]);
+						cache._cache.should.not.containEql(res.request.auth.session.id);
+						res.request.auth.session.id.should.be.eql(
+							crypto.createHmac(hmacAlgo, secret)
+								.update(cookie[1])
+								.digest('base64')
+						);
+						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: `sid=${cookie[1]}` } });
+					}).then(res => {
+						testResponse(200, res);
+						should.not.exist(res.headers['set-cookie']);
+						res.result.should.be.equal(resource);
+
+					})
+					.then(() => server.inject({ method: 'GET', url: '/login/valid', headers: { nonexisting: '' } }))
+					.then(res => {
+						let header, cookie;
+						should.exist(res);
+						res.result.should.be.equal('valid');
+						header = res.headers['set-cookie'];
+						header.length.should.be.equal(1);
+						header[0].should.match(/Max-Age=60/);
+						cookie = header[0].match(cookieRegex);
+						cookie[1].length.should.be.eql(Math.ceil(sidLength / 3 * 4));
+						cache._cache.should.not.containEql(cookie[1]);
+						cache._cache.should.not.containEql(res.request.auth.session.id);
+						res.request.auth.session.id.should.be.eql(
+							crypto.createHmac(hmacAlgo, secret)
+								.update(cookie[1])
+								.digest('base64')
+						);
+						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: `sid=${cookie[1]}` } });
+					}).then(res => {
+						testResponse(200, res);
+						should.not.exist(res.headers['set-cookie']);
+						res.result.should.be.equal(resource);
+
+					})
+					.then(() => server.inject({ method: 'GET', url: '/login/valid', headers: { 'X-custom': `custom-${Math.random()}` } }))
+					.then(res => {
+						let header, cookie;
+						should.exist(res);
+						res.result.should.be.equal('valid');
+						header = res.headers['set-cookie'];
+						header.length.should.be.equal(1);
+						header[0].should.match(/Max-Age=60/);
+						cookie = header[0].match(cookieRegex);
+						cookie[1].length.should.be.eql(Math.ceil(sidLength / 3 * 4));
+						cache._cache.should.not.containEql(cookie[1]);
+						cache._cache.should.not.containEql(res.request.auth.session.id);
+						res.request.auth.session.id.should.be.eql(
+							crypto.createHmac(hmacAlgo, secret)
+								.update(cookie[1])
+								.update(res.request.headers['x-custom'])
+								.digest('base64')
+						);
+						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: `sid=${cookie[1]}`, 'X-custom': res.request.headers['x-custom'] } });
+					}).then(res => {
+						testResponse(200, res);
+						should.not.exist(res.headers['set-cookie']);
+						res.result.should.be.equal(resource);
+
+					}).finally(() => server.stop());
+
+			});
+	});
+
+	it('should fail start if hmacAlgo is not supported', () => {
+		const hmacAlgo = 'no-such-algo';
+		const secret   = 'secret';
+		return setServer({ secret, hmacAlgo })
+			.should.be.rejectedWith(`Node install does not seem to support HMAC using algorithm ${hmacAlgo}`);
 	});
 
 	it('ends a session', () => {
@@ -798,7 +1018,6 @@ describe('clear()', () => {
 						return null;
 					}
 				});
-
 
 				return server.start()
 					.then(() => server.inject(`/login/${name}`))

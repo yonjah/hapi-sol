@@ -24,6 +24,7 @@ module.exports = {
                 "before": true
             }
         ],
+        "no-return-await": "error",
         "block-scoped-var": "error",
         "block-spacing": "error",
         "brace-style": [

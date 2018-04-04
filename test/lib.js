@@ -1,10 +1,11 @@
 /* globals describe, before, it*/
 "use strict";
-var Promise      = require('bluebird'),
-	should       = require('should'),
-	sinon        = require('sinon'),
-	sol          = require('../'),
-	uidGenerator = require(process.env.COVER === 'SOL' ? '../lib-cov/uidGenerator' : '../lib/uidGenerator');
+const crypto       = require('crypto');
+const Promise      = require('bluebird');
+const should       = require('should');
+const sinon        = require('sinon');
+const sol          = require('../');
+const uidGenerator = require(process.env.COVER === 'SOL' ? '../lib-cov/uidGenerator' : '../lib/uidGenerator');
 
 require('should-sinon');
 
@@ -122,6 +123,80 @@ describe('Sol lib', function () {
 
 		});
 
+		describe('session.getInternalId', function () {
+			let implement;
+			const cache = {
+				set : sinon.stub(),
+				drop: sinon.stub(),
+				get : sinon.stub()
+			};
+			const events = {};
+			const fakeServer = {
+				auth: {
+					scheme (id, func) {
+						implement = func;
+					}
+				},
+				cache () {
+					return cache;
+				},
+				state () {},
+				ext (eventKey, func) {
+					events[eventKey] = func;
+				}
+			};
+
+			describe('with secret',  () => {
+				const hmacAlgo = 'sha1';
+				const secret   = 'secret';
+				const settings = { hmacAlgo, secret, hmacRequest: null };
+				const sid = Math.random().toString(32).substr(2, 10);
+				const request = { state: {sid: sid}, auth: {}};
+				sol.register(fakeServer, {});
+				implement(fakeServer, settings);
+				events.onPreAuth(request, {});
+				request.auth.should.have.property('session');
+				const session = request.auth.session;
+				beforeEach(() => {
+					session.id = undefined;
+				});
+
+				it('should return HMAC session id if valid', function () {
+					session.getInternalId().should.be.eql(crypto.createHmac(hmacAlgo, secret)
+								.update(sid)
+								.digest('base64'));
+				});
+
+				it('should return null if session id is not valid', function () {
+					request.state.sid = {fake: 'not valid session'};
+					should.not.exist(session.getInternalId());
+				});
+			});
+
+			describe('without secret', () => {
+				const settings = {};
+				const sid = Math.random().toString(32).substr(2, 10);
+				const request = { state: {sid: sid}, auth: {}};
+				sol.register(fakeServer, {});
+				implement(fakeServer, settings);
+				events.onPreAuth(request, {});
+				request.auth.should.have.property('session');
+				const session = request.auth.session;
+				beforeEach(() => {
+					session.id = undefined;
+				});
+
+				it('should return public session id if valid', function () {
+					session.getInternalId().should.be.eql(sid);
+				});
+
+				it('should return null if session id is not valid', function () {
+					request.state.sid = {fake: 'not valid session'};
+					should.not.exist(session.getInternalId());
+				});
+			});
+		});
+
 		describe('session.clear', function () {
 			let implement;
 			const events = {};
@@ -219,6 +294,10 @@ describe('Sol lib', function () {
 			events.onPreAuth(request, h);
 			request.auth.should.have.property('session');
 			const session = request.auth.session;
+
+			beforeEach(() => {
+				session.id = undefined;
+			});
 
 			it('should be call cache.get with sid and resolve with Promise', async function () {
 				const res = {fake: 'cache'};
