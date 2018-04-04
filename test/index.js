@@ -7,8 +7,9 @@ const hoek    = require('hoek');
 const Promise = require('bluebird');
 const sol     = require('../');
 
-const cookieRegex = /(?:[^()<>@,;:\\"/[\]?={}\x7F]+)\s*=\s*(?:([^",;\\\x7F]*))/;
+require('should-sinon');
 
+const cookieRegex = /(?:[^()<>@,;:\\"/[\]?={}\x7F]+)\s*=\s*(?:([^",;\\\x7F]*))/;
 
 async function setServer (options) {
 	var server = new hapi.Server();
@@ -1219,4 +1220,138 @@ describe('redirection', () => {
 					}).finally(() => server.stop());
 
 			}));
+});
+
+describe('rlClient', () => {
+	const name  = 'steve';
+	const user  = { fake: 'user'};
+	const take  = sinon.stub();
+	const query = sinon.stub();
+	const rlClient = {
+		take: (a, b) => take(a, b),
+		query: (a, b) => query(a, b)
+	};
+
+	beforeEach(() => {
+		take.reset();
+		query.reset();
+	});
+
+	it('it checks rateLimiting before checking session', () => {
+		const limit = {
+			conformant: false,
+			size: 10,
+			remaining: 0,
+			ttl: Math.ceil(Date.now() / 1000) + 100
+		};
+		query.resolves(limit);
+		return setServer({ ttl: 60 * 1000, rlClient})
+			.then(server => {
+				addLoginRoute(server, user);
+
+				return server.start()
+					.then(() => server.inject(`/login/${name}`))
+					.then(res => {
+						res.statusCode.should.be.eql(429);
+						query.should.be.calledOnce();
+						take.should.not.be.called();
+						should(res.headers).not.have.property('set-cookie');
+						should(res.headers).have.property('x-ratelimit-limit', limit.size);
+						should(res.headers).have.property('x-ratelimit-remaining', limit.remaining);
+						should(res.headers).have.property('x-ratelimit-reset', limit.ttl);
+					}).finally(() => server.stop());
+			});
+	});
+
+	it('it take token from rateLimiting if authFails', () => {
+		const limit = {
+			conformant: true,
+			size: 10,
+			remaining: 5,
+			ttl: Math.ceil(Date.now() / 1000) + 100
+		};
+		query.resolves({conformant: true});
+		take.resolves(limit);
+		return setServer({ ttl: 60 * 1000, rlClient})
+			.then(server => {
+				addResourceRoute(server, user);
+
+				return server.start()
+					.then(() => server.inject(`/resource`))
+					.then(res => {
+						res.statusCode.should.be.eql(401);
+						query.should.be.calledOnce();
+						take.should.be.calledOnce();
+						should(res.headers).have.property('set-cookie');
+						should(res.headers).have.property('x-ratelimit-limit', limit.size);
+						should(res.headers).have.property('x-ratelimit-remaining', limit.remaining);
+						should(res.headers).have.property('x-ratelimit-reset', limit.ttl);
+					}).finally(() => server.stop());
+			});
+	});
+
+	it('it should not set headers if rlAddHeaders is false', () => {
+		const limit = {
+			conformant: false,
+			size: 10,
+			remaining: 0,
+			ttl: Math.ceil(Date.now() / 1000) + 100
+		};
+		query.resolves(limit);
+		return setServer({ ttl: 60 * 1000, rlClient, rlAddHeaders: false})
+			.then(server => {
+				addRoutes(server, user);
+
+				return server.start()
+					.then(() => server.inject(`/login/${name}`))
+					.then(res => {
+						res.statusCode.should.be.eql(429);
+						query.should.be.calledOnce();
+						take.should.not.be.called();
+						should(res.headers).not.have.property('x-ratelimit-limit');
+						should(res.headers).not.have.property('x-ratelimit-remaining');
+						should(res.headers).not.have.property('x-ratelimit-reset');
+
+						query.reset();
+						take.reset();
+						query.resolves({conformant: true});
+						take.resolves(limit);
+					})
+					.then(() => server.inject(`/resource`))
+					.then(res => {
+						res.statusCode.should.be.eql(401);
+						query.should.be.calledOnce();
+						take.should.be.calledOnce();
+						should(res.headers).not.have.property('x-ratelimit-limit');
+						should(res.headers).not.have.property('x-ratelimit-remaining');
+						should(res.headers).not.have.property('x-ratelimit-reset');
+					})
+					.finally(() => server.stop());
+			});
+	});
+
+	it('it should log error returned from rate limiting server ', () => {
+		const rlError = new Error('Ha!');
+		query.resolves({conformant: true});
+		take.rejects(rlError);
+		return setServer({ ttl: 60 * 1000, rlClient, rlAddHeaders: false})
+			.then(server => {
+				server.route({
+					method: 'GET',
+					path: '/resource',
+					config: {log: {collect: true}},
+					handler: () => true
+				});
+
+				return server.start()
+					.then(() => server.inject(`/resource`))
+					.then(res => {
+						res.statusCode.should.be.eql(401);
+						query.should.be.calledOnce();
+						take.should.be.calledOnce();
+						res.request.logs.should.containDeep([{tags: ['error'], error: rlError}]);
+					})
+					.finally(() => server.stop());
+			});
+	});
 });

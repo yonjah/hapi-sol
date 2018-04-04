@@ -82,9 +82,13 @@ when setting an auth strategy you can set the following options:
 - `isHttpOnly` Set HTTP only cookie flag __default(true)__
 - `isSecure` Force SSL for cookie __default(true)__
 - `secret` Secret to be used to create local HMAC of the cookie id can help reduce timing attacks and using stolen cookies __default(null)__
-- `hmacAlgo` HMAC algorithm to be used (only used if `secret` is set) _default(sha1)_
-- `hmacEncoding` HMAC encoding (only used if `secret` is set) _default(base64)_
-- `hmacRequest` Array of values to be taken from the request that will be included in the HMAC make session harder to steal(only used if `secret` is set) _default(['info.remoteAddress', 'headers.user-agent'])_
+- `hmacAlgo` HMAC algorithm to be used (only used if `secret` is set) _default(sha1)__
+- `hmacEncoding` HMAC encoding (only used if `secret` is set) _default(base64)__
+- `hmacRequest` Array of values to be taken from the request that will be included in the HMAC make session harder to steal(only used if `secret` is set) _default(['info.remoteAddress', 'headers.user-agent'])__
+- `rlClient` rate limiting client to use for rate  limiting users who try to bruteforce session ids. you can use [ralphi-client](https://github.com/yonjah/ralphi/tree/master/client) or any object which implements `query` and `take` methods.
+- `rlBucket` bucket to use for rate limiting __default('session')__
+- `rlGetKey` function for getting the rate limiting key from the request __default(request => request.info.remoteAddress)__
+- `rlAddHeaders` add rate limiting headers to limited responses __default(true)__
 - `password` Password to be use to encrypt the cookie data sent to the user, since we are not sending any sensitive data this can be be left undefined __default(undefined)__
 - `cacheId` the cache ID to use when saving sessions __default('\_hapi\_session')__
 - `cache` caching manager if you want to use your own storage (needs to implement _get_,_set_ and _drop_ methods) __default(undefined)__
