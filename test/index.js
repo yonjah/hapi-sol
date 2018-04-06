@@ -213,15 +213,6 @@ describe('scheme', () => {
 
 	);
 
-	it('fails if password is not a string or buffer', () =>
-		setServer({ password: 2432 })
-			.then(() => {
-				throw new Error('should not fullfill');
-
-			}, () => {})
-
-	);
-
 	it('fails if redirectTo is not a string or empty value', () =>
 		setServer({ redirectTo: 12354 })
 			.then(() => {
@@ -324,38 +315,6 @@ describe('scheme', () => {
 					}).then(response => {
 						testResponse(401, response);
 						response.result.message.should.be.eql('Not authenticated');
-
-					}).finally(() => server.stop());
-
-			});
-	});
-
-	it('should work with encrypted cookies encrypts session cookie', () => {
-		const user = { fake: 'user'};
-		const resource = {fake: 'resource'};
-		const sidLength = 10;
-		return setServer({ ttl: 60 * 1000, sidLength, cookie: 'encrypted', password: 'test' + Array(32).join('a')})
-			.then(server => {
-				addRoutes(server, user, resource);
-
-
-				return server.start()
-					.then(() => server.inject('/login/valid'))
-					.then(res => {
-						let header, cookie;
-						should.exist(res);
-						res.result.should.be.equal('valid');
-						header = res.headers['set-cookie'];
-						header.length.should.be.equal(1);
-						header[0].should.match(/Max-Age=60/);
-						cookie = header[0].match(cookieRegex);
-						cookie[1].should.startWith('Fe');
-						cookie[1].length.should.be.above(sidLength * 4);
-						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: 'encrypted=' + cookie[1] } });
-					}).then(res => {
-						testResponse(200, res);
-						should.not.exist(res.headers['set-cookie']);
-						res.result.should.be.equal(resource);
 
 					}).finally(() => server.stop());
 

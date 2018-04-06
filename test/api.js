@@ -56,9 +56,8 @@ describe('Sol Plugin API', function () {
 				},
 				state: function (cookieId, options) {
 					cookieId.should.be.eql(settings.cookie);
-					options.encoding.should.be.eql(settings.password ? 'iron' : 'none');
+					options.encoding.should.be.eql('none');
 					options.ttl.should.be.eql(settings.ttl);
-					(options.password === settings.password).should.be.ok;
 					options.isSecure.should.be.eql(settings.isSecure);
 					options.isHttpOnly.should.be.eql(settings.isHttpOnly);
 					options.path.should.be.eql(settings.path);
@@ -77,7 +76,6 @@ describe('Sol Plugin API', function () {
 				isSecure     : true,
 				isHttpOnly   : true,
 				redirectOnTry: true,
-				password     : undefined,
 				redirectTo   : '',
 				validateFunc : undefined,
 				appendNext   : '',
