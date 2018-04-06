@@ -1,18 +1,38 @@
 /* globals describe, before, it, beforeEach*/
 "use strict";
-const should = require('should');
-const sol    = require('../');
-const hapi   = require('hapi');
+const {fork}   = require('child_process');
+const should   = require('should');
+const sol      = require('../');
+const hapi     = require('hapi');
+const RlClient = require('ralphi-client');
+
 
 let port = 3000;
 
-describe('Sol Server Auth', function () {
-	const options = {};
-	const server  = new hapi.Server({ port: ++port });
+describe('Sol Integration', () => {
+	const server   = new hapi.Server({ port: ++port });
+	const rlClient = new RlClient();
+	const options  = { rlClient };
+	const rlSize   = 2;
+	let ralphi,
+		call = false;
 
-	let call    = false;
-
-	before(async function () {
+	before(async () => {
+		const rlReady = new Promise((resolve, reject) => {
+			ralphi = fork('node_modules/.bin/ralphi', [`session,${rlSize},1m`], {silent: true});
+			ralphi.on('error', (err) => {
+				throw new Error(err);
+			});
+			ralphi.on('close', (code) => {
+				if (code > 0) {
+					throw new Error(`ralphi server process exited with code ${code}`);
+				}
+			});
+			ralphi.stdout.on('data', (data) => {
+				resolve(true);
+			});
+		});
+		await rlReady;
 		await server.register(sol);
 		server.auth.strategy('session', 'session', options);
 		server.auth.default('session');
@@ -21,7 +41,7 @@ describe('Sol Server Auth', function () {
 				method: 'GET',
 				path: '/',
 				config: {
-					handler: function () {
+					handler: () => {
 						call = true;
 						return null;
 					}
@@ -59,15 +79,17 @@ describe('Sol Server Auth', function () {
 		await server.start();
 	});
 
-	after(async function () {
+	after(async () => {
+		ralphi.kill();
 		await server.stop();
 	});
 
-	beforeEach(function () {
+	beforeEach(async () => {
 		call = false;
+		await rlClient.reset('session', '127.0.0.1');
 	});
 
-	it('should not give access to route without auth', function () {
+	it('should not give access to route without auth', () => {
 		return server.inject({url : '/'})
 			.then(function (response) {
 				response.statusCode.should.be.eql(401);
@@ -75,7 +97,7 @@ describe('Sol Server Auth', function () {
 			});
 	});
 
-	it('should give access after login', function () {
+	it('should give access after login', () => {
 		return server.inject({url : '/login'})
 			.then(function (response) {
 				var cookie;
@@ -94,8 +116,7 @@ describe('Sol Server Auth', function () {
 			});
 	});
 
-
-	it('should reject access after logout', function () {
+	it('should reject access after logout', () => {
 		var cookie;
 		return server.inject({url : '/login'})
 			.then(function (response) {
@@ -118,5 +139,24 @@ describe('Sol Server Auth', function () {
 				response.statusCode.should.be.eql(401);
 				call.should.not.be.ok;
 			});
+	});
+
+	it('should take one token on failed access', async () => {
+		const response = await server.inject('/');
+		response.statusCode.should.be.eql(401);
+		const limit = await rlClient.query('session', '127.0.0.1');
+		limit.should.have.property('remaining', rlSize - 1);
+	});
+
+	it('should prevent login if rate limit reached', async () => {
+		let limit;
+		for (let i = 0; i < rlSize ; i += 1) {
+			limit = await rlClient.take('session', '127.0.0.1');
+		}
+		const response = await server.inject('/login');
+		response.statusCode.should.be.eql(429);
+		response.headers.should.have.property('x-ratelimit-limit', limit.size);
+		response.headers.should.have.property('x-ratelimit-remaining', limit.remaining);
+		response.headers.should.have.property('x-ratelimit-reset', limit.ttl);
 	});
 });
