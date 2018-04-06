@@ -381,7 +381,7 @@ describe('scheme', () => {
 			}
 		};
 		const hmacAlgo = 'sha1';
-		const secret   = 'secret';
+		const secret   = 'secretDoNotTell!';
 		return setServer({ ttl: 60 * 1000, sidLength, secret, cache, hmacAlgo})
 			.then(server => {
 				addRoutes(server, user, resource);
@@ -437,7 +437,7 @@ describe('scheme', () => {
 			}
 		};
 		const hmacAlgo = 'sha256';
-		const secret   = 'secret';
+		const secret   = 'secretDoNotTell!';
 		return setServer({ ttl: 60 * 1000, sidLength, secret, cache, hmacAlgo, hmacRequest: ['headers.host']})
 			.then(server => {
 				addRoutes(server, user, resource);
@@ -491,7 +491,7 @@ describe('scheme', () => {
 			}
 		};
 		const hmacAlgo = 'sha1';
-		const secret   = 'secret';
+		const secret   = 'secretDoNotTell!';
 		return setServer({ ttl: 60 * 1000, sidLength, secret, cache, hmacAlgo, hmacRequest: ['headers.nonexisting', 'headers.x-custom']})
 			.then(server => {
 				addRoutes(server, user, resource);
@@ -576,7 +576,7 @@ describe('scheme', () => {
 
 	it('should fail start if hmacAlgo is not supported', () => {
 		const hmacAlgo = 'no-such-algo';
-		const secret   = 'secret';
+		const secret   = 'secretDoNotTell!';
 		return setServer({ secret, hmacAlgo })
 			.should.be.rejectedWith(`Node install does not seem to support HMAC using algorithm ${hmacAlgo}`);
 	});

@@ -94,8 +94,8 @@ when setting an auth strategy you can set the following options:
 - `cache` caching manager if you want to use your own storage (needs to implement _get_,_set_ and _drop_ methods) __default(undefined)__
 - `validateFunc` A function to farther validate the cookie if needed function signature should be (request, credentials) __default(undefined)__
 - `clearInvalid` If cookie is tested to be invalid by the validateFunc should we clear the existing cookie __default(true)__
-- `sidLength` The length in Bytes for the generated random ID Should be high enough so collision would be impossible __default(36)__
-- `uidRetries` How many retries should be made to generate the ID (in case of collisions or missing entropy) __default(5)__
+- `sidLength` The length in Bytes for the generated random ID Should be high enough so collision would be impossible minimum 10 bytes __default(16)__
+- `uidRetries` How many retries should be made to generate the ID (in case of missing entropy) __default(5)__
 - `redirectTo` Location to redirect to in case of auth Error __default(''//Empty string)__
 - `appendNext` if truthy will add a query parameter with the same name in the redirection url back to the current route boolean true will set the name 'next' __default(''//Empty string)__
 - `redirectOnTry` if mode is set to try and auth fails redirect the request __default(false)__

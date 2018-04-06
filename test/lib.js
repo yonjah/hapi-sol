@@ -148,7 +148,7 @@ describe('Sol lib', function () {
 
 			describe('with secret',  () => {
 				const hmacAlgo = 'sha1';
-				const secret   = 'secret';
+				const secret   = 'secretDoNotTell!';
 				const settings = { hmacAlgo, secret, hmacRequest: null };
 				const sid = Math.random().toString(32).substr(2, 10);
 				const request = { state: {sid: sid}, auth: {}};
@@ -421,38 +421,30 @@ describe('Sol lib', function () {
 					});
 			});
 
-			it('should reject if uid exist and no more tries', function () {
-				const generator = uidGenerator(1, 0);
-				let uids = 0;
-				function recGen () {
-					return generator()
-						.then(() => {
-							uids++;
-							if (uids < 256) {
-								return recGen();
-							}
-						});
-				}
-
-				return recGen().should.be.rejected();
+			it('should reject if getRandomBytes fail and no more retries', function () {
+				const error = new Error('no way');
+				const getRandomBytes = sinon.stub().rejects(error);
+				return uidGenerator(10, 0, getRandomBytes)()
+					.should.be.rejectedWith(`too many tries: ${error.message}`);
 			});
 
-			it('should never return the same uid', function () {
-				const generator = uidGenerator(1, 1000);
-				const uids = [];
+			it('should continue trying as long as retries are available', function () {
+				const error = new Error('no way');
+				const getRandomBytes = sinon.stub().rejects(error);
+				return uidGenerator(10, 1, getRandomBytes)()
+					.should.be.rejectedWith(`too many tries: ${error.message}`)
+					.then(() => {
+						getRandomBytes.should.have.been.calledTwice();
+					});
+			});
 
-				function recGen () {
-					return generator()
-						.then(uid => {
-							uids.indexOf(uid).should.be.eql(-1);
-							uids.push(uid);
-							if (uids.length < 256) {
-								return recGen();
-							}
-						});
-				}
-
-				return recGen();
+			it('should pass correct len to getRandomBytes', function () {
+				const len = Math.ceil(Math.random() * 20);
+				const getRandomBytes = sinon.stub().resolves(Buffer.alloc(len, 'a'));
+				return uidGenerator(len, 1, getRandomBytes)()
+					.then(() => {
+						getRandomBytes.should.have.been.calledWith(len);
+					});
 			});
 		});
 	});
