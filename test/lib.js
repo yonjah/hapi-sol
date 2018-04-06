@@ -1,10 +1,11 @@
 /* globals describe, before, it*/
 "use strict";
-var Promise      = require('bluebird'),
-	should       = require('should'),
-	sinon        = require('sinon'),
-	sol          = require('../'),
-	uidGenerator = require(process.env.COVER === 'SOL' ? '../lib-cov/uidGenerator' : '../lib/uidGenerator');
+const crypto       = require('crypto');
+const Promise      = require('bluebird');
+const should       = require('should');
+const sinon        = require('sinon');
+const sol          = require('../');
+const uidGenerator = require(process.env.COVER === 'SOL' ? '../lib-cov/uidGenerator' : '../lib/uidGenerator');
 
 require('should-sinon');
 
@@ -122,6 +123,80 @@ describe('Sol lib', function () {
 
 		});
 
+		describe('session.getInternalId', function () {
+			let implement;
+			const cache = {
+				set : sinon.stub(),
+				drop: sinon.stub(),
+				get : sinon.stub()
+			};
+			const events = {};
+			const fakeServer = {
+				auth: {
+					scheme (id, func) {
+						implement = func;
+					}
+				},
+				cache () {
+					return cache;
+				},
+				state () {},
+				ext (eventKey, func) {
+					events[eventKey] = func;
+				}
+			};
+
+			describe('with secret',  () => {
+				const hmacAlgo = 'sha1';
+				const secret   = 'secretDoNotTell!';
+				const settings = { hmacAlgo, secret, hmacRequest: null };
+				const sid = Math.random().toString(32).substr(2, 10);
+				const request = { state: {sid: sid}, auth: {}};
+				sol.register(fakeServer, {});
+				implement(fakeServer, settings);
+				events.onPreAuth(request, {});
+				request.auth.should.have.property('session');
+				const session = request.auth.session;
+				beforeEach(() => {
+					session.id = undefined;
+				});
+
+				it('should return HMAC session id if valid', function () {
+					session.getInternalId().should.be.eql(crypto.createHmac(hmacAlgo, secret)
+								.update(sid)
+								.digest('base64'));
+				});
+
+				it('should return null if session id is not valid', function () {
+					request.state.sid = {fake: 'not valid session'};
+					should.not.exist(session.getInternalId());
+				});
+			});
+
+			describe('without secret', () => {
+				const settings = {};
+				const sid = Math.random().toString(32).substr(2, 10);
+				const request = { state: {sid: sid}, auth: {}};
+				sol.register(fakeServer, {});
+				implement(fakeServer, settings);
+				events.onPreAuth(request, {});
+				request.auth.should.have.property('session');
+				const session = request.auth.session;
+				beforeEach(() => {
+					session.id = undefined;
+				});
+
+				it('should return public session id if valid', function () {
+					session.getInternalId().should.be.eql(sid);
+				});
+
+				it('should return null if session id is not valid', function () {
+					request.state.sid = {fake: 'not valid session'};
+					should.not.exist(session.getInternalId());
+				});
+			});
+		});
+
 		describe('session.clear', function () {
 			let implement;
 			const events = {};
@@ -219,6 +294,10 @@ describe('Sol lib', function () {
 			events.onPreAuth(request, h);
 			request.auth.should.have.property('session');
 			const session = request.auth.session;
+
+			beforeEach(() => {
+				session.id = undefined;
+			});
 
 			it('should be call cache.get with sid and resolve with Promise', async function () {
 				const res = {fake: 'cache'};
@@ -342,38 +421,30 @@ describe('Sol lib', function () {
 					});
 			});
 
-			it('should reject if uid exist and no more tries', function () {
-				const generator = uidGenerator(1, 0);
-				let uids = 0;
-				function recGen () {
-					return generator()
-						.then(() => {
-							uids++;
-							if (uids < 256) {
-								return recGen();
-							}
-						});
-				}
-
-				return recGen().should.be.rejected();
+			it('should reject if getRandomBytes fail and no more retries', function () {
+				const error = new Error('no way');
+				const getRandomBytes = sinon.stub().rejects(error);
+				return uidGenerator(10, 0, getRandomBytes)()
+					.should.be.rejectedWith(`too many tries: ${error.message}`);
 			});
 
-			it('should never return the same uid', function () {
-				const generator = uidGenerator(1, 1000);
-				const uids = [];
+			it('should continue trying as long as retries are available', function () {
+				const error = new Error('no way');
+				const getRandomBytes = sinon.stub().rejects(error);
+				return uidGenerator(10, 1, getRandomBytes)()
+					.should.be.rejectedWith(`too many tries: ${error.message}`)
+					.then(() => {
+						getRandomBytes.should.have.been.calledTwice();
+					});
+			});
 
-				function recGen () {
-					return generator()
-						.then(uid => {
-							uids.indexOf(uid).should.be.eql(-1);
-							uids.push(uid);
-							if (uids.length < 256) {
-								return recGen();
-							}
-						});
-				}
-
-				return recGen();
+			it('should pass correct len to getRandomBytes', function () {
+				const len = Math.ceil(Math.random() * 20);
+				const getRandomBytes = sinon.stub().resolves(Buffer.alloc(len, 'a'));
+				return uidGenerator(len, 1, getRandomBytes)()
+					.then(() => {
+						getRandomBytes.should.have.been.calledWith(len);
+					});
 			});
 		});
 	});

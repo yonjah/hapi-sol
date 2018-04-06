@@ -12,10 +12,10 @@ module.exports = {
             "never"
         ],
         "array-callback-return": "off",
-        "arrow-body-style": "error",
+        "arrow-body-style": "off",
         "arrow-parens": [
             "error",
-            "as-needed"
+            "always"
         ],
         "arrow-spacing": [
             "error",
@@ -24,6 +24,7 @@ module.exports = {
                 "before": true
             }
         ],
+        "no-return-await": "error",
         "block-scoped-var": "error",
         "block-spacing": "error",
         "brace-style": [

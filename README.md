@@ -81,13 +81,20 @@ when setting an auth strategy you can set the following options:
 - `ttl` Cookie and cache TTL in milliseconds __default(1000 * 60 * 60 * 24 //one day)__
 - `isHttpOnly` Set HTTP only cookie flag __default(true)__
 - `isSecure` Force SSL for cookie __default(true)__
-- `password` Password to be use to encrypt the cookie data sent to the user, since we are not sending any sensitive data this can be be left undefined __default(undefined)__
+- `secret` Secret to be used to create local HMAC of the cookie id can help reduce timing attacks and using stolen cookies __default(null)__
+- `hmacAlgo` HMAC algorithm to be used (only used if `secret` is set) _default(sha1)__
+- `hmacEncoding` HMAC encoding (only used if `secret` is set) _default(base64)__
+- `hmacRequest` Array of values to be taken from the request that will be included in the HMAC make session harder to steal(only used if `secret` is set) _default(['info.remoteAddress', 'headers.user-agent'])__
+- `rlClient` rate limiting client to use for rate  limiting users who try to bruteforce session ids. you can use [ralphi-client](https://github.com/yonjah/ralphi/tree/master/client) or any object which implements `query` and `take` methods.
+- `rlBucket` bucket to use for rate limiting __default('session')__
+- `rlGetKey` function for getting the rate limiting key from the request __default(request => request.info.remoteAddress)__
+- `rlAddHeaders` add rate limiting headers to limited responses __default(true)__
 - `cacheId` the cache ID to use when saving sessions __default('\_hapi\_session')__
 - `cache` caching manager if you want to use your own storage (needs to implement _get_,_set_ and _drop_ methods) __default(undefined)__
 - `validateFunc` A function to farther validate the cookie if needed function signature should be (request, credentials) __default(undefined)__
 - `clearInvalid` If cookie is tested to be invalid by the validateFunc should we clear the existing cookie __default(true)__
-- `sidLength` The length in Bytes for the generated random ID Should be high enough so collision would be impossible __default(36)__
-- `uidRetries` How many retries should be made to generate the ID (in case of collisions or missing entropy) __default(5)__
+- `sidLength` The length in Bytes for the generated random ID Should be high enough so collision would be impossible minimum 10 bytes __default(16)__
+- `uidRetries` How many retries should be made to generate the ID (in case of missing entropy) __default(5)__
 - `redirectTo` Location to redirect to in case of auth Error __default(''//Empty string)__
 - `appendNext` if truthy will add a query parameter with the same name in the redirection url back to the current route boolean true will set the name 'next' __default(''//Empty string)__
 - `redirectOnTry` if mode is set to try and auth fails redirect the request __default(false)__

@@ -1,6 +1,6 @@
 {
   "name": "hapi-sol",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "A simpler session based auth plugin for Hapi",
   "main": "index.js",
   "repository": {
@@ -25,6 +25,8 @@
     "mocha": "^5.0.0",
     "mocha-istanbul": "^0.3.0",
     "nyc": "^11.4.1",
+    "ralphi": "^2.0.1",
+    "ralphi-client": "^2.0.1",
     "should": "^13.2.1",
     "should-sinon": "0.0.6",
     "sinon": "^4.2.2"

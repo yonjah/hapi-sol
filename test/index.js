@@ -1,4 +1,5 @@
 "use strict";
+const crypto  = require('crypto');
 const should  = require('should');
 const sinon   = require('sinon');
 const hapi    = require('hapi');
@@ -6,8 +7,9 @@ const hoek    = require('hoek');
 const Promise = require('bluebird');
 const sol     = require('../');
 
-const cookieRegex = /(?:[^()<>@,;:\\"/[\]?={}\x7F]+)\s*=\s*(?:([^",;\\\x7F]*))/;
+require('should-sinon');
 
+const cookieRegex = /(?:[^()<>@,;:\\"/[\]?={}\x7F]+)\s*=\s*(?:([^",;\\\x7F]*))/;
 
 async function setServer (options) {
 	var server = new hapi.Server();
@@ -211,15 +213,6 @@ describe('scheme', () => {
 
 	);
 
-	it('fails if password is not a string or buffer', () =>
-		setServer({ password: 2432 })
-			.then(() => {
-				throw new Error('should not fullfill');
-
-			}, () => {})
-
-	);
-
 	it('fails if redirectTo is not a string or empty value', () =>
 		setServer({ redirectTo: 12354 })
 			.then(() => {
@@ -272,12 +265,12 @@ describe('scheme', () => {
 		let user = { fake: 'user'},
 			resource = {fake: 'resource'};
 		return setServer({ ttl: 60 * 1000, cookie: 'special'})
-			.then(server => {
+			.then((server) => {
 				addRoutes(server, user, resource);
 
 				return server.start()
 					.then(() => server.inject('/login/valid'))
-					.then(res => {
+					.then((res) => {
 						let header, cookie;
 						should.exist(res);
 						res.result.should.be.equal('valid');
@@ -287,7 +280,7 @@ describe('scheme', () => {
 						cookie = header[0].match(cookieRegex);
 						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: 'special=' + cookie[1] } });
 
-					}).then(res => {
+					}).then((res) => {
 						testResponse(200, res);
 						should.not.exist(res.headers['set-cookie']);
 						res.result.should.be.equal(resource);
@@ -300,7 +293,7 @@ describe('scheme', () => {
 	it('sets session id on initial request', () => {
 		let resource = {fake: 'resource'};
 		return setServer({ ttl: 60 * 1000, cookie: 'special'})
-			.then(server => {
+			.then((server) => {
 				server.route({
 					method: 'GET', path: '/resource', handler: function () {
 						return resource;
@@ -309,7 +302,7 @@ describe('scheme', () => {
 
 				return server.start()
 					.then(() => server.inject('/resource'))
-					.then(response => {
+					.then((response) => {
 						let header, cookie;
 						testResponse(401, response);
 						response.result.message.should.be.eql('Bad Session');
@@ -319,7 +312,7 @@ describe('scheme', () => {
 						cookie = header[0].match(cookieRegex);
 						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: 'special=' + cookie[1] } });
 
-					}).then(response => {
+					}).then((response) => {
 						testResponse(401, response);
 						response.result.message.should.be.eql('Not authenticated');
 
@@ -328,18 +321,34 @@ describe('scheme', () => {
 			});
 	});
 
-	it('should work with encrypted cookies encrypts session cookie', () => {
+	it('should work with secret to create local HMAC of seesion id', () => {
 		const user = { fake: 'user'};
 		const resource = {fake: 'resource'};
-		const sidLength = 10;
-		return setServer({ ttl: 60 * 1000, sidLength, cookie: 'encrypted', password: 'test' + Array(32).join('a')})
-			.then(server => {
+		const sidLength = 12;
+		const cache  = {
+			_cache : [],
+			async set (key, value/*, ttl*/) {
+				this._cache[key] = value;
+				return true;
+			},
+			async get (key) {
+				return this._cache[key];
+			},
+			async drop (key) {
+				delete this._cache[key];
+				return true;
+			}
+		};
+		const hmacAlgo = 'sha1';
+		const secret   = 'secretDoNotTell!';
+		return setServer({ ttl: 60 * 1000, sidLength, secret, cache, hmacAlgo})
+			.then((server) => {
 				addRoutes(server, user, resource);
 
 
 				return server.start()
 					.then(() => server.inject('/login/valid'))
-					.then(res => {
+					.then((res) => {
 						let header, cookie;
 						should.exist(res);
 						res.result.should.be.equal('valid');
@@ -347,10 +356,18 @@ describe('scheme', () => {
 						header.length.should.be.equal(1);
 						header[0].should.match(/Max-Age=60/);
 						cookie = header[0].match(cookieRegex);
-						cookie[1].should.startWith('Fe');
-						cookie[1].length.should.be.above(sidLength * 4);
-						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: 'encrypted=' + cookie[1] } });
-					}).then(res => {
+						cookie[1].length.should.be.eql(Math.ceil(sidLength / 3 * 4));
+						cache._cache.should.not.containEql(cookie[1]);
+						cache._cache.should.not.containEql(res.request.auth.session.id);
+						res.request.auth.session.id.should.be.eql(
+							crypto.createHmac(hmacAlgo, secret)
+								.update(cookie[1])
+								.update(res.request.info.remoteAddress)
+								.update(res.request.headers['user-agent'])
+								.digest('base64')
+						);
+						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: `sid=${cookie[1]}` } });
+					}).then((res) => {
 						testResponse(200, res);
 						should.not.exist(res.headers['set-cookie']);
 						res.result.should.be.equal(resource);
@@ -360,11 +377,174 @@ describe('scheme', () => {
 			});
 	});
 
+	it('should create HMAC with custom hmacAlgo and hmacRequest', () => {
+		const user = { fake: 'user'};
+		const resource = {fake: 'resource'};
+		const sidLength = 12;
+		const cache  = {
+			_cache : [],
+			async set (key, value/*, ttl*/) {
+				this._cache[key] = value;
+				return true;
+			},
+			async get (key) {
+				return this._cache[key];
+			},
+			async drop (key) {
+				delete this._cache[key];
+				return true;
+			}
+		};
+		const hmacAlgo = 'sha256';
+		const secret   = 'secretDoNotTell!';
+		return setServer({ ttl: 60 * 1000, sidLength, secret, cache, hmacAlgo, hmacRequest: ['headers.host']})
+			.then((server) => {
+				addRoutes(server, user, resource);
+
+				return server.start()
+					.then(() => server.inject('/login/valid'))
+					.then((res) => {
+						let header, cookie;
+						should.exist(res);
+						res.result.should.be.equal('valid');
+						header = res.headers['set-cookie'];
+						header.length.should.be.equal(1);
+						header[0].should.match(/Max-Age=60/);
+						cookie = header[0].match(cookieRegex);
+						cookie[1].length.should.be.eql(Math.ceil(sidLength / 3 * 4));
+						cache._cache.should.not.containEql(cookie[1]);
+						cache._cache.should.not.containEql(res.request.auth.session.id);
+						res.request.auth.session.id.should.be.eql(
+							crypto.createHmac(hmacAlgo, secret)
+								.update(cookie[1])
+								.update(res.request.headers.host)
+								.digest('base64')
+						);
+						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: `sid=${cookie[1]}` } });
+					}).then((res) => {
+						testResponse(200, res);
+						should.not.exist(res.headers['set-cookie']);
+						res.result.should.be.equal(resource);
+
+					}).finally(() => server.stop());
+
+			});
+	});
+
+	it('should create HMAC with nonexisting  and custom headers', () => {
+		const user = { fake: 'user'};
+		const resource = {fake: 'resource'};
+		const sidLength = 12;
+		const cache  = {
+			_cache : [],
+			async set (key, value/*, ttl*/) {
+				this._cache[key] = value;
+				return true;
+			},
+			async get (key) {
+				return this._cache[key];
+			},
+			async drop (key) {
+				delete this._cache[key];
+				return true;
+			}
+		};
+		const hmacAlgo = 'sha1';
+		const secret   = 'secretDoNotTell!';
+		return setServer({ ttl: 60 * 1000, sidLength, secret, cache, hmacAlgo, hmacRequest: ['headers.nonexisting', 'headers.x-custom']})
+			.then((server) => {
+				addRoutes(server, user, resource);
+
+				return server.start()
+					.then(() => server.inject('/login/valid'))
+					.then((res) => {
+						let header, cookie;
+						should.exist(res);
+						res.result.should.be.equal('valid');
+						header = res.headers['set-cookie'];
+						header.length.should.be.equal(1);
+						header[0].should.match(/Max-Age=60/);
+						cookie = header[0].match(cookieRegex);
+						cookie[1].length.should.be.eql(Math.ceil(sidLength / 3 * 4));
+						cache._cache.should.not.containEql(cookie[1]);
+						cache._cache.should.not.containEql(res.request.auth.session.id);
+						res.request.auth.session.id.should.be.eql(
+							crypto.createHmac(hmacAlgo, secret)
+								.update(cookie[1])
+								.digest('base64')
+						);
+						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: `sid=${cookie[1]}` } });
+					}).then((res) => {
+						testResponse(200, res);
+						should.not.exist(res.headers['set-cookie']);
+						res.result.should.be.equal(resource);
+
+					})
+					.then(() => server.inject({ method: 'GET', url: '/login/valid', headers: { nonexisting: '' } }))
+					.then((res) => {
+						let header, cookie;
+						should.exist(res);
+						res.result.should.be.equal('valid');
+						header = res.headers['set-cookie'];
+						header.length.should.be.equal(1);
+						header[0].should.match(/Max-Age=60/);
+						cookie = header[0].match(cookieRegex);
+						cookie[1].length.should.be.eql(Math.ceil(sidLength / 3 * 4));
+						cache._cache.should.not.containEql(cookie[1]);
+						cache._cache.should.not.containEql(res.request.auth.session.id);
+						res.request.auth.session.id.should.be.eql(
+							crypto.createHmac(hmacAlgo, secret)
+								.update(cookie[1])
+								.digest('base64')
+						);
+						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: `sid=${cookie[1]}` } });
+					}).then((res) => {
+						testResponse(200, res);
+						should.not.exist(res.headers['set-cookie']);
+						res.result.should.be.equal(resource);
+
+					})
+					.then(() => server.inject({ method: 'GET', url: '/login/valid', headers: { 'X-custom': `custom-${Math.random()}` } }))
+					.then((res) => {
+						let header, cookie;
+						should.exist(res);
+						res.result.should.be.equal('valid');
+						header = res.headers['set-cookie'];
+						header.length.should.be.equal(1);
+						header[0].should.match(/Max-Age=60/);
+						cookie = header[0].match(cookieRegex);
+						cookie[1].length.should.be.eql(Math.ceil(sidLength / 3 * 4));
+						cache._cache.should.not.containEql(cookie[1]);
+						cache._cache.should.not.containEql(res.request.auth.session.id);
+						res.request.auth.session.id.should.be.eql(
+							crypto.createHmac(hmacAlgo, secret)
+								.update(cookie[1])
+								.update(res.request.headers['x-custom'])
+								.digest('base64')
+						);
+						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: `sid=${cookie[1]}`, 'X-custom': res.request.headers['x-custom'] } });
+					}).then((res) => {
+						testResponse(200, res);
+						should.not.exist(res.headers['set-cookie']);
+						res.result.should.be.equal(resource);
+
+					}).finally(() => server.stop());
+
+			});
+	});
+
+	it('should fail start if hmacAlgo is not supported', () => {
+		const hmacAlgo = 'no-such-algo';
+		const secret   = 'secretDoNotTell!';
+		return setServer({ secret, hmacAlgo })
+			.should.be.rejectedWith(`Node install does not seem to support HMAC using algorithm ${hmacAlgo}`);
+	});
+
 	it('ends a session', () => {
 		let user = { fake: 'user'},
 			cookie;
 		return setServer({ ttl: 60 * 1000, cookie: 'special'})
-			.then(server => {
+			.then((server) => {
 				addLoginRoute(server, user);
 
 				server.route({
@@ -376,7 +556,7 @@ describe('scheme', () => {
 
 				return server.start()
 					.then(() => server.inject('/login/valid'))
-					.then(res => {
+					.then((res) => {
 						let header;
 						should.exist(res);
 						res.result.should.be.equal('valid');
@@ -386,7 +566,7 @@ describe('scheme', () => {
 						cookie = header[0].match(cookieRegex);
 						return server.inject({ method: 'GET', url: '/logout', headers: { cookie: 'special=' + cookie[1] } });
 
-					}).then(res => {
+					}).then((res) => {
 						let id,
 							header;
 						testResponse(200, res);
@@ -399,7 +579,7 @@ describe('scheme', () => {
 						id.should.be.ok();
 						id.should.not.be.eql(cookie[1]);
 						return server.inject({ method: 'GET', url: '/logout', headers: { cookie: 'special=' + cookie[1] } });
-					}).then(res => {
+					}).then((res) => {
 						testResponse(401, res);
 
 					}).finally(() => server.stop());
@@ -409,7 +589,7 @@ describe('scheme', () => {
 	});
 
 	it('clear session on invalid id', () => setServer({ ttl: 60 * 1000, cookie: 'special', clearInvalid: true})
-			.then(server => {
+			.then((server) => {
 				const id = '123456';
 				server.route({
 					method: 'GET', path: '/', handler: () => 'ok'
@@ -418,7 +598,7 @@ describe('scheme', () => {
 
 				return server.start()
 					.then(() => server.inject({url: '/',  headers: { cookie: `special=${id}` }}))
-					.then(res => {
+					.then((res) => {
 						let cookie,
 							header;
 						should.exist(res);
@@ -446,7 +626,7 @@ describe('scheme', () => {
 				.withArgs(creds).resolves([true, newCreds]);
 
 		return setServer({ ttl: 60 * 1000, cookie: 'special', validateFunc: validateFunc})
-			.then(server => {
+			.then((server) => {
 				server.route({
 					method: 'GET', path: '/login/{user}',
 					config: {
@@ -470,7 +650,7 @@ describe('scheme', () => {
 
 				return server.start()
 					.then(() => server.inject('/login/valid'))
-					.then(res => {
+					.then((res) => {
 						let header, cookie;
 						should.exist(res);
 						res.result.should.be.equal('valid');
@@ -480,7 +660,7 @@ describe('scheme', () => {
 						cookie = header[0].match(cookieRegex);
 						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: 'special=' + cookie[1] } });
 
-					}).then(res => {
+					}).then((res) => {
 						testResponse(200, res);
 						should.not.exist(res.headers['set-cookie']);
 						res.result.should.be.equal(resource);
@@ -502,12 +682,12 @@ describe('scheme', () => {
 		}
 
 		return setServer({ ttl: 60 * 1000, cookie: 'special', clearInvalid: true, validateFunc: validateFunc})
-			.then(server => {
+			.then((server) => {
 				addRoutes(server, user, resource);
 
 				return server.start()
 					.then(() => server.inject('/login/invalid'))
-					.then(response => {
+					.then((response) => {
 						let header;
 						should.exist(response);
 						response.result.should.be.equal('invalid');
@@ -517,7 +697,7 @@ describe('scheme', () => {
 						cookie = header[0].match(cookieRegex);
 						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: 'special=' + cookie[1] } });
 
-					}).then(response => {
+					}).then((response) => {
 						let id,
 							header;
 						testResponse(401, response);
@@ -547,12 +727,12 @@ describe('scheme', () => {
 		}
 
 		return setServer({ ttl: 60 * 1000, cookie: 'special', clearInvalid: false, validateFunc: validateFunc})
-			.then(server => {
+			.then((server) => {
 				addRoutes(server, user, resource);
 
 				return server.start()
 					.then(() => server.inject('/login/invalid'))
-					.then(res => {
+					.then((res) => {
 						let header;
 						should.exist(res);
 						res.result.should.be.equal('invalid');
@@ -562,7 +742,7 @@ describe('scheme', () => {
 						cookie = header[0].match(cookieRegex);
 						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: 'special=' + cookie[1] } });
 
-					}).then(res => {
+					}).then((res) => {
 						should.not.exist(res.headers['set-cookie']);
 						testResponse(401, res);
 					}).finally(() => server.stop());
@@ -578,7 +758,7 @@ describe('scheme', () => {
 			cookie;
 
 		return setServer({ ttl: 60 * 1000, cookie: 'special'})
-			.then(server => {
+			.then((server) => {
 				server.route({
 					method: 'GET', path: '/login/{user}',
 					config: {
@@ -602,7 +782,7 @@ describe('scheme', () => {
 
 				return server.start()
 					.then(() => server.inject(`/login/${name}`))
-					.then(res => {
+					.then((res) => {
 						let header;
 						should.exist(res);
 						res.result.should.be.equal(name);
@@ -612,7 +792,7 @@ describe('scheme', () => {
 						cookie = header[0].match(cookieRegex);
 						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: 'special=' + cookie[1] } });
 
-					}).then(res => {
+					}).then((res) => {
 						testResponse(200, res);
 						res.result.should.be.equal(resource);
 					}).finally(() => server.stop());
@@ -633,12 +813,12 @@ describe('scheme', () => {
 		}
 
 		return setServer({ ttl: 60 * 1000, cookie: 'special', validateFunc: validateFunc})
-			.then(server => {
+			.then((server) => {
 				addRoutes(server, user, resource);
 
 				return server.start()
 					.then(() => server.inject(`/login/${name}`))
-					.then(res => {
+					.then((res) => {
 						let header;
 						should.exist(res);
 						res.result.should.be.equal(name);
@@ -647,7 +827,7 @@ describe('scheme', () => {
 						header[0].should.match(/Max-Age=60/);
 						cookie = header[0].match(cookieRegex);
 						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: 'special=' + cookie[1] } });
-					}).then(res => {
+					}).then((res) => {
 						testResponse(401, res);
 					}).finally(() => server.stop());
 
@@ -660,12 +840,12 @@ describe('scheme', () => {
 			user     = { fake: 'user'};
 
 		return setServer({ cookie: 'special', sessionCookie: true})
-			.then(server => {
+			.then((server) => {
 				addLoginRoute(server, user);
 
 				return server.start()
 					.then(() => server.inject(`/login/${name}`))
-					.then(res => {
+					.then((res) => {
 						let header;
 						should.exist(res);
 						res.result.should.be.equal(name);
@@ -685,7 +865,7 @@ describe('scheme', () => {
 			resource = { fake: 'resource'};
 
 		return setServer({ cookie: 'special', ttl: 60 * 1000, path: path })
-			.then(server => {
+			.then((server) => {
 				server.route({
 					method: 'GET', path: `${path}/login/{user}`,
 					config: {
@@ -710,7 +890,7 @@ describe('scheme', () => {
 
 				return server.start()
 					.then(() => server.inject(`${path}/login/${name}`))
-					.then(res => {
+					.then((res) => {
 						let header, cookie;
 						should.exist(res);
 						res.result.should.be.equal(name);
@@ -720,7 +900,7 @@ describe('scheme', () => {
 						header[0].should.match(new RegExp(`Path=${path}`));
 						cookie = header[0].match(cookieRegex);
 						return server.inject({ method: 'GET', url: `${path}/resource`, headers: { cookie: 'special=' + cookie[1] } });
-					}).then(res => {
+					}).then((res) => {
 						testResponse(200, res);
 						res.result.should.be.equal(resource);
 					}).finally(() => server.stop());
@@ -736,7 +916,7 @@ describe('set()', () => {
 		let name = 'steve';
 
 		return setServer({ ttl: 60 * 1000, cookie: 'special'})
-			.then(server => {
+			.then((server) => {
 				server.route({
 					method: 'GET', path: '/login/{user}',
 					config: {
@@ -756,7 +936,7 @@ describe('set()', () => {
 
 				return server.start()
 					.then(() => server.inject(`/login/${name}`))
-					.then(res => {
+					.then((res) => {
 						should.exist(res);
 						res.result.should.be.equal('Invalid credentials');
 
@@ -789,7 +969,7 @@ describe('clear()', () => {
 			};
 
 		return setServer({ ttl: 60 * 1000, cookie: 'special', cache: cache})
-			.then(server => {
+			.then((server) => {
 				addLoginRoute(server, user);
 
 				server.route({
@@ -799,10 +979,9 @@ describe('clear()', () => {
 					}
 				});
 
-
 				return server.start()
 					.then(() => server.inject(`/login/${name}`))
-					.then(res => {
+					.then((res) => {
 						let header, cookie;
 						should.exist(res);
 						res.result.should.be.equal(name);
@@ -812,7 +991,7 @@ describe('clear()', () => {
 						cookie = header[0].match(cookieRegex);
 						should(_cache).have.property(cookie[1]);
 						return server.inject({ method: 'GET', url: '/clearKey', headers: { cookie: 'special=' + cookie[1] } })
-							.then(res => {
+							.then((res) => {
 								testResponse(200, res);
 								should(_cache).not.have.property(cookie[1]);
 
@@ -828,7 +1007,7 @@ describe('clear()', () => {
 describe('redirection', () => {
 
 	it('sends to login page (uri without query)', () => setServer({ ttl: 60 * 1000, cookie: 'special', redirectTo: 'http://example.com/login', appendNext: true})
-			.then(server => {
+			.then((server) => {
 				server.route({
 					method: 'GET', path: '/', handler: () => 'never'
 				});
@@ -836,7 +1015,7 @@ describe('redirection', () => {
 
 				return server.start()
 					.then(() => server.inject('/'))
-					.then(res => {
+					.then((res) => {
 						testResponse(302, res);
 						res.headers.should.have.property('location', 'http://example.com/login?next=%2F');
 
@@ -849,7 +1028,7 @@ describe('redirection', () => {
 				cookie    : 'special',
 				redirectTo: 'http://example.com/login?mode=1',
 				appendNext: true
-			}).then(server => {
+			}).then((server) => {
 				server.route({
 					method: 'GET', path: '/', handler: () => 'never'
 				});
@@ -857,7 +1036,7 @@ describe('redirection', () => {
 
 				return server.start()
 					.then(() => server.inject('/'))
-					.then(res => {
+					.then((res) => {
 						testResponse(302, res);
 						res.headers.should.have.property('location', 'http://example.com/login?mode=1&next=%2F');
 
@@ -866,7 +1045,7 @@ describe('redirection', () => {
 			}));
 
 	it('skips when redirectTo is set to false', () => setServer({ ttl: 60 * 1000, cookie: 'special', redirectTo: false, appendNext: true})
-			.then(server => {
+			.then((server) => {
 				server.route({
 					method: 'GET', path: '/', handler: () => 'never'
 				});
@@ -874,7 +1053,7 @@ describe('redirection', () => {
 
 				return server.start()
 					.then(() => server.inject('/'))
-					.then(res => {
+					.then((res) => {
 						testResponse(401, res);
 
 					}).finally(() => server.stop());
@@ -882,7 +1061,7 @@ describe('redirection', () => {
 			}));
 
 	it('skips when route override', () => setServer({ ttl: 60 * 1000, cookie: 'special', redirectTo: 'http://example.com/login', appendNext: true})
-			.then(server => {
+			.then((server) => {
 				server.route({
 					method: 'GET',
 					path: '/',
@@ -899,7 +1078,7 @@ describe('redirection', () => {
 
 				return server.start()
 					.then(() => server.inject('/'))
-					.then(res => {
+					.then((res) => {
 						testResponse(401, res);
 
 					}).finally(() => server.stop());
@@ -907,7 +1086,7 @@ describe('redirection', () => {
 			}));
 
 	it('skips when redirectOnTry is false in try mode', () => setServer({ ttl: 60 * 1000, cookie: 'special', redirectOnTry: false, redirectTo: 'http://example.com/login', appendNext: true})
-			.then(server => {
+			.then((server) => {
 				server.route({
 					method: 'GET',
 					path: '/',
@@ -923,7 +1102,7 @@ describe('redirection', () => {
 
 				return server.start()
 					.then(() => server.inject('/'))
-					.then(res => {
+					.then((res) => {
 						testResponse(200, res);
 						res.result.should.be.equal(false);
 
@@ -937,7 +1116,7 @@ describe('redirection', () => {
 				cookie    : 'special',
 				redirectTo: 'http://example.com/login?mode=1',
 				appendNext: false
-			}).then(server => {
+			}).then((server) => {
 				server.route({
 					method: 'GET', path: '/', handler: () => 'never'
 				});
@@ -945,7 +1124,7 @@ describe('redirection', () => {
 
 				return server.start()
 					.then(() => server.inject('/'))
-					.then(res => {
+					.then((res) => {
 						testResponse(302, res);
 						res.headers.should.have.property('location', 'http://example.com/login?mode=1');
 
@@ -960,7 +1139,7 @@ describe('redirection', () => {
 				cookie    : 'special',
 				redirectTo: 'http://example.com/login?mode=1',
 				appendNext: next
-			}).then(server => {
+			}).then((server) => {
 				server.route({
 					method: 'GET', path: '/', handler: () => 'never'
 				});
@@ -968,7 +1147,7 @@ describe('redirection', () => {
 
 				return server.start()
 					.then(() => server.inject('/'))
-					.then(res => {
+					.then((res) => {
 						testResponse(302, res);
 						res.headers.should.have.property('location', `http://example.com/login?mode=1&${next}=%2F`);
 
@@ -982,7 +1161,7 @@ describe('redirection', () => {
 				cookie       : 'special',
 				redirectTo   : 'http://example.com/login?mode=1',
 				redirectOnTry: true
-			}).then(server => {
+			}).then((server) => {
 				server.route({
 					method: 'GET', path: '/',
 					config: {
@@ -994,10 +1173,144 @@ describe('redirection', () => {
 
 				return server.start()
 					.then(() => server.inject('/'))
-					.then(res => {
+					.then((res) => {
 						testResponse(302, res);
 
 					}).finally(() => server.stop());
 
 			}));
+});
+
+describe('rlClient', () => {
+	const name  = 'steve';
+	const user  = { fake: 'user'};
+	const take  = sinon.stub();
+	const query = sinon.stub();
+	const rlClient = {
+		take: (a, b) => take(a, b),
+		query: (a, b) => query(a, b)
+	};
+
+	beforeEach(() => {
+		take.reset();
+		query.reset();
+	});
+
+	it('it checks rateLimiting before checking session', () => {
+		const limit = {
+			conformant: false,
+			size: 10,
+			remaining: 0,
+			ttl: Math.ceil(Date.now() / 1000) + 100
+		};
+		query.resolves(limit);
+		return setServer({ ttl: 60 * 1000, rlClient})
+			.then((server) => {
+				addLoginRoute(server, user);
+
+				return server.start()
+					.then(() => server.inject(`/login/${name}`))
+					.then((res) => {
+						res.statusCode.should.be.eql(429);
+						query.should.be.calledOnce();
+						take.should.not.be.called();
+						should(res.headers).not.have.property('set-cookie');
+						should(res.headers).have.property('x-ratelimit-limit', limit.size);
+						should(res.headers).have.property('x-ratelimit-remaining', limit.remaining);
+						should(res.headers).have.property('x-ratelimit-reset', limit.ttl);
+					}).finally(() => server.stop());
+			});
+	});
+
+	it('it take token from rateLimiting if authFails', () => {
+		const limit = {
+			conformant: true,
+			size: 10,
+			remaining: 5,
+			ttl: Math.ceil(Date.now() / 1000) + 100
+		};
+		query.resolves({conformant: true});
+		take.resolves(limit);
+		return setServer({ ttl: 60 * 1000, rlClient})
+			.then((server) => {
+				addResourceRoute(server, user);
+
+				return server.start()
+					.then(() => server.inject(`/resource`))
+					.then((res) => {
+						res.statusCode.should.be.eql(401);
+						query.should.be.calledOnce();
+						take.should.be.calledOnce();
+						should(res.headers).have.property('set-cookie');
+						should(res.headers).have.property('x-ratelimit-limit', limit.size);
+						should(res.headers).have.property('x-ratelimit-remaining', limit.remaining);
+						should(res.headers).have.property('x-ratelimit-reset', limit.ttl);
+					}).finally(() => server.stop());
+			});
+	});
+
+	it('it should not set headers if rlAddHeaders is false', () => {
+		const limit = {
+			conformant: false,
+			size: 10,
+			remaining: 0,
+			ttl: Math.ceil(Date.now() / 1000) + 100
+		};
+		query.resolves(limit);
+		return setServer({ ttl: 60 * 1000, rlClient, rlAddHeaders: false})
+			.then((server) => {
+				addRoutes(server, user);
+
+				return server.start()
+					.then(() => server.inject(`/login/${name}`))
+					.then((res) => {
+						res.statusCode.should.be.eql(429);
+						query.should.be.calledOnce();
+						take.should.not.be.called();
+						should(res.headers).not.have.property('x-ratelimit-limit');
+						should(res.headers).not.have.property('x-ratelimit-remaining');
+						should(res.headers).not.have.property('x-ratelimit-reset');
+
+						query.reset();
+						take.reset();
+						query.resolves({conformant: true});
+						take.resolves(limit);
+					})
+					.then(() => server.inject(`/resource`))
+					.then((res) => {
+						res.statusCode.should.be.eql(401);
+						query.should.be.calledOnce();
+						take.should.be.calledOnce();
+						should(res.headers).not.have.property('x-ratelimit-limit');
+						should(res.headers).not.have.property('x-ratelimit-remaining');
+						should(res.headers).not.have.property('x-ratelimit-reset');
+					})
+					.finally(() => server.stop());
+			});
+	});
+
+	it('it should log error returned from rate limiting server ', () => {
+		const rlError = new Error('Ha!');
+		query.resolves({conformant: true});
+		take.rejects(rlError);
+		return setServer({ ttl: 60 * 1000, rlClient, rlAddHeaders: false})
+			.then((server) => {
+				server.route({
+					method: 'GET',
+					path: '/resource',
+					config: {log: {collect: true}},
+					handler: () => true
+				});
+
+				return server.start()
+					.then(() => server.inject(`/resource`))
+					.then((res) => {
+						res.statusCode.should.be.eql(401);
+						query.should.be.calledOnce();
+						take.should.be.calledOnce();
+						res.request.logs.should.containDeep([{tags: ['error'], error: rlError}]);
+					})
+					.finally(() => server.stop());
+			});
+	});
 });
