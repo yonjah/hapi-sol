@@ -18,7 +18,7 @@ describe('Sol Integration', () => {
 		call = false;
 
 	before(async () => {
-		const rlReady = new Promise((resolve, reject) => {
+		const rlReady = new Promise((resolve) => {
 			ralphi = fork('node_modules/.bin/ralphi', [`session,${rlSize},1m`], {silent: true});
 			ralphi.on('error', (err) => {
 				throw new Error(err);
@@ -28,7 +28,7 @@ describe('Sol Integration', () => {
 					throw new Error(`ralphi server process exited with code ${code}`);
 				}
 			});
-			ralphi.stdout.on('data', (data) => {
+			ralphi.stdout.on('data', () => {
 				resolve(true);
 			});
 		});
