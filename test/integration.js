@@ -31,6 +31,9 @@ describe('Sol Integration', () => {
 			ralphi.stdout.on('data', () => {
 				resolve(true);
 			});
+			ralphi.stderr.on('data', (err) => {
+				throw new Error(err.toString());
+			});
 		});
 		await rlReady;
 		await server.register(sol);
