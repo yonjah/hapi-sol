@@ -805,10 +805,11 @@ describe('scheme', () => {
 		let name = 'steve',
 			user = { fake: 'user'},
 			resource = { fake: 'resource'},
+			ErrorMsg = 'Boom',
 			cookie;
 
 		function validateFunc (/*request, session*/) {
-			throw new Error('boom');
+			throw new Error(ErrorMsg);
 
 		}
 
@@ -828,7 +829,8 @@ describe('scheme', () => {
 						cookie = header[0].match(cookieRegex);
 						return server.inject({ method: 'GET', url: '/resource', headers: { cookie: 'special=' + cookie[1] } });
 					}).then((res) => {
-						testResponse(401, res);
+						testResponse(500, res);
+						JSON.stringify(res.result).should.not.containEql(ErrorMsg);
 					}).finally(() => server.stop());
 
 			});
