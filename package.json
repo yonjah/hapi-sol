@@ -25,8 +25,8 @@
     "mocha": "^5.2.0",
     "mocha-istanbul": "^0.3.0",
     "nyc": "^11.9.0",
-    "ralphi": "^2.1.0",
-    "ralphi-client": "^2.1.0",
+    "ralphi": "^3.0.1",
+    "ralphi-client": "^3.0.1",
     "should": "^13.2.1",
     "should-sinon": "0.0.6",
     "sinon": "^4.5.0"
