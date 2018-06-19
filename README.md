@@ -91,7 +91,7 @@ when setting an auth strategy you can set the following options:
 - `rlAddHeaders` add rate limiting headers to limited responses __default(true)__
 - `cacheId` the cache ID to use when saving sessions __default('\_hapi\_session')__
 - `cache` caching manager if you want to use your own storage (needs to implement _get_,_set_ and _drop_ methods) __default(undefined)__
-- `validateFunc` A function to farther validate the cookie if needed function signature should be (request, credentials) __default(undefined)__
+- `validateFunc` Async function to farther validate the cookie if needed function signature should be (request, credentials) function should return an array first item is boolean value indicating if credentials are valid, and optional second value can be returned with an object of a parsed credentials to replace the credentials being set in the authentication process __default(undefined)__
 - `clearInvalid` If cookie is tested to be invalid by the validateFunc should we clear the existing cookie __default(true)__
 - `sidLength` The length in Bytes for the generated random ID Should be high enough so collision would be impossible minimum 10 bytes __default(16)__
 - `uidRetries` How many retries should be made to generate the ID (in case of missing entropy) __default(5)__
