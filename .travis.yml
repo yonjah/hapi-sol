@@ -20,18 +20,27 @@ jobs:
       node_js: 8
       env:
         - RUN_TEST=true
+
     - stage: tests
       node_js: 9
       env:
         - RUN_TEST=true
+
+    - stage: tests
+      node_js: 10
+      env:
+        - RUN_TEST=true
+
     - stage: tests
       node_js: node
       env:
         - RUN_TEST=true
+
     - stage: coverage
       node_js: 8
       env:
         - COVERAGE=true
+
     - stage: lint
       node_js: 8
       env: LINT=true
