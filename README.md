@@ -2,7 +2,7 @@
 [![npm version](https://img.shields.io/npm/v/hapi-sol.svg)](https://www.npmjs.com/package/hapi-sol)
 [![Build Status](https://travis-ci.org/yonjah/hapi-sol.svg?branch=master)](https://travis-ci.org/yonjah/hapi-sol)
 [![codecov](https://codecov.io/gh/yonjah/hapi-sol/branch/master/graph/badge.svg)](https://codecov.io/gh/yonjah/hapi-sol)
-[![License](https://img.shields.io/npm/l/hapi-sol.svg?maxAge=2592000?style=plastic)](https://github.com/yonjah/hapi-sol/blob/master/LICENSE)
+[![License](https://img.shields.io/npm/l/hapi-sol.svg?maxAge=2592000?style=plastic)](https://github.com/yonjah/hapi-sol/blob/master/LICENSE) [![Greenkeeper badge](https://badges.greenkeeper.io/yonjah/hapi-sol.svg)](https://greenkeeper.io/)
 
 A Session based auth scheme for Hapi
 
