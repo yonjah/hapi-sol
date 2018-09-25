@@ -20,16 +20,16 @@
   },
   "devDependencies": {
     "bluebird": "^3.5.1",
-    "eslint": "^4.19.1",
+    "eslint": "^5.6.0",
     "hapi": "^17.5.1",
     "mocha": "^5.2.0",
     "mocha-istanbul": "^0.3.0",
-    "nyc": "^11.9.0",
+    "nyc": "^13.0.1",
     "ralphi": "^3.0.1",
     "ralphi-client": "^3.0.1",
     "should": "^13.2.1",
     "should-sinon": "0.0.6",
-    "sinon": "^4.5.0"
+    "sinon": "^6.3.4"
   },
   "scripts": {
     "test": "ENVIRONMENT=test mocha test",
