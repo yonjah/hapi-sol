@@ -9,6 +9,15 @@ cache:
   directories:
     - node_modules
 
+before_install:
+  - if [[ $TRAVIS_BRANCH == greenkeeper* ]]; then npm install -g greenkeeper-lockfile; fi
+
+install:
+  - if [[ $TRAVIS_BRANCH == greenkeeper* ]]; then npm install; else npm ci; fi
+
+before_script: if [[ $TRAVIS_BRANCH == greenkeeper* ]]; then greenkeeper-lockfile-update; fi
+after_script: if [[ $TRAVIS_BRANCH == greenkeeper* ]]; then greenkeeper-lockfile-upload; fi
+
 script:
   - 'if [ $HAPI_VERSION ]; then npm install hapi@^$HAPI_VERSION.0.0 || echo "done"; fi'
   - "if [ $LINT ]; then npm run lint; fi"
