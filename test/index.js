@@ -1019,7 +1019,7 @@ describe('redirection', () => {
 					.then(() => server.inject('/'))
 					.then((res) => {
 						testResponse(302, res);
-						res.headers.should.have.property('location', 'http://example.com/login?next=%2F');
+						should(res.headers).have.property('location', 'http://example.com/login?next=%2F');
 
 					}).finally(() => server.stop());
 
@@ -1040,7 +1040,7 @@ describe('redirection', () => {
 					.then(() => server.inject('/'))
 					.then((res) => {
 						testResponse(302, res);
-						res.headers.should.have.property('location', 'http://example.com/login?mode=1&next=%2F');
+						should(res.headers).have.property('location', 'http://example.com/login?mode=1&next=%2F');
 
 					}).finally(() => server.stop());
 
@@ -1128,7 +1128,7 @@ describe('redirection', () => {
 					.then(() => server.inject('/'))
 					.then((res) => {
 						testResponse(302, res);
-						res.headers.should.have.property('location', 'http://example.com/login?mode=1');
+						should(res.headers).have.property('location', 'http://example.com/login?mode=1');
 
 					}).finally(() => server.stop());
 
@@ -1151,7 +1151,7 @@ describe('redirection', () => {
 					.then(() => server.inject('/'))
 					.then((res) => {
 						testResponse(302, res);
-						res.headers.should.have.property('location', `http://example.com/login?mode=1&${next}=%2F`);
+						should(res.headers).have.property('location', `http://example.com/login?mode=1&${next}=%2F`);
 
 					}).finally(() => server.stop());
 

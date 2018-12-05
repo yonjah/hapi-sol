@@ -105,7 +105,7 @@ describe('Sol Integration', () => {
 			.then(function (response) {
 				var cookie;
 				response.statusCode.should.be.eql(200);
-				response.headers.should.have.property('set-cookie');
+				should(response.headers).have.property('set-cookie');
 				response.headers['set-cookie'].should.have.length(1);
 				cookie = response.headers['set-cookie'][0].split(';')[0];
 				should.exist(cookie);
@@ -124,7 +124,7 @@ describe('Sol Integration', () => {
 		return server.inject({url : '/login'})
 			.then(function (response) {
 				response.statusCode.should.be.eql(200);
-				response.headers.should.have.property('set-cookie');
+				should(response.headers).have.property('set-cookie');
 				response.headers['set-cookie'].should.have.length(1);
 				cookie = response.headers['set-cookie'][0].split(';')[0];
 				should.exist(cookie);
@@ -158,8 +158,8 @@ describe('Sol Integration', () => {
 		}
 		const response = await server.inject('/login');
 		response.statusCode.should.be.eql(429);
-		response.headers.should.have.property('x-ratelimit-limit', limit.size);
-		response.headers.should.have.property('x-ratelimit-remaining', limit.remaining);
-		response.headers.should.have.property('x-ratelimit-reset', limit.ttl);
+		should(response.headers).have.property('x-ratelimit-limit', limit.size);
+		should(response.headers).have.property('x-ratelimit-remaining', limit.remaining);
+		should(response.headers).have.property('x-ratelimit-reset', limit.ttl);
 	});
 });
