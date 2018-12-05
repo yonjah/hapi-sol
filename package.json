@@ -19,17 +19,17 @@
     "url": "https://github.com/yonjah/hapi-sol/issues"
   },
   "devDependencies": {
-    "bluebird": "^3.5.1",
-    "eslint": "^5.6.0",
-    "hapi": "^17.5.1",
+    "bluebird": "^3.5.3",
+    "eslint": "^5.9.0",
+    "hapi": "^17.8.1",
     "mocha": "^5.2.0",
     "mocha-istanbul": "^0.3.0",
-    "nyc": "^13.0.1",
-    "ralphi": "^3.0.1",
-    "ralphi-client": "^3.0.1",
-    "should": "^13.2.1",
+    "nyc": "^13.1.0",
+    "ralphi": "^3.1.2",
+    "ralphi-client": "^3.1.2",
+    "should": "^13.2.3",
     "should-sinon": "0.0.6",
-    "sinon": "^6.3.4"
+    "sinon": "^7.1.1"
   },
   "scripts": {
     "test": "ENVIRONMENT=test mocha test",
@@ -38,9 +38,9 @@
     "lint": "eslint lib/ test/ examples/"
   },
   "dependencies": {
-    "boom": "^7.2.0",
-    "hoek": "^5.0.3",
-    "joi": "^14.0.1"
+    "boom": "^7.3.0",
+    "hoek": "^6.1.2",
+    "joi": "^14.3.0"
   },
   "peerDependencies": {
     "hapi": ">=8.x.x"
