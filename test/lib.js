@@ -1,5 +1,4 @@
-/* globals describe, before, it*/
-"use strict";
+'use strict';
 const crypto       = require('crypto');
 const Promise      = require('bluebird');
 const should       = require('should');

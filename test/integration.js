@@ -1,5 +1,4 @@
-/* globals describe, before, it, beforeEach*/
-"use strict";
+'use strict';
 const {fork}   = require('child_process');
 const should   = require('should');
 const sol      = require('../');

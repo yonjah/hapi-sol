@@ -1,5 +1,4 @@
-/* globals describe, it*/
-"use strict";
+'use strict';
 const sol  = require('../');
 const name = 'sol';
 const id   = 'session';

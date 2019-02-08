@@ -1,4 +1,4 @@
-"use strict";
+'use strict';
 const crypto  = require('crypto');
 const should  = require('should');
 const sinon   = require('sinon');
@@ -1238,7 +1238,7 @@ describe('rlClient', () => {
 				addResourceRoute(server, user);
 
 				return server.start()
-					.then(() => server.inject(`/resource`))
+					.then(() => server.inject('/resource'))
 					.then((res) => {
 						res.statusCode.should.be.eql(401);
 						query.should.be.calledOnce();
@@ -1278,7 +1278,7 @@ describe('rlClient', () => {
 						query.resolves({conformant: true});
 						take.resolves(limit);
 					})
-					.then(() => server.inject(`/resource`))
+					.then(() => server.inject('/resource'))
 					.then((res) => {
 						res.statusCode.should.be.eql(401);
 						query.should.be.calledOnce();
@@ -1305,7 +1305,7 @@ describe('rlClient', () => {
 				});
 
 				return server.start()
-					.then(() => server.inject(`/resource`))
+					.then(() => server.inject('/resource'))
 					.then((res) => {
 						res.statusCode.should.be.eql(401);
 						query.should.be.calledOnce();

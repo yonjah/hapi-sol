@@ -1,4 +1,4 @@
-"use strict";
+'use strict';
 const hapi    = require('hapi');
 const sol     = require('../');
 const server  = new hapi.Server({port: 8000, debug: {request: ['error']}});
