@@ -20,16 +20,16 @@
   },
   "devDependencies": {
     "bluebird": "^3.5.3",
-    "eslint": "^5.9.0",
-    "hapi": "^17.8.1",
+    "eslint": "^5.13.0",
+    "hapi": "^18.1.0",
     "mocha": "^5.2.0",
     "mocha-istanbul": "^0.3.0",
-    "nyc": "^13.1.0",
+    "nyc": "^13.2.0",
     "ralphi": "^3.1.2",
     "ralphi-client": "^3.1.2",
     "should": "^13.2.3",
     "should-sinon": "0.0.6",
-    "sinon": "^7.1.1"
+    "sinon": "^7.2.3"
   },
   "scripts": {
     "test": "ENVIRONMENT=test mocha test",
@@ -40,7 +40,7 @@
   "dependencies": {
     "boom": "^7.3.0",
     "hoek": "^6.1.2",
-    "joi": "^14.3.0"
+    "joi": "^14.3.1"
   },
   "peerDependencies": {
     "hapi": ">=8.x.x"
