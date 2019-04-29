@@ -24,7 +24,7 @@
     "hapi": "^18.1.0",
     "mocha": "^5.2.0",
     "mocha-istanbul": "^0.3.0",
-    "nyc": "^13.2.0",
+    "nyc": "^14.0.0",
     "ralphi": "^3.1.2",
     "ralphi-client": "^3.1.2",
     "should": "^13.2.3",
